@@ -11,32 +11,29 @@ declare(strict_types=1);
 
 namespace PhpEtl\GoogleAnalytics\Tests\Extractors;
 
-use PhpEtl\GoogleAnalytics\Tests\TestCase;
 use PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics;
+use PhpEtl\GoogleAnalytics\Tests\TestCase;
 use Wizaplace\Etl\Row;
 
 /**
- * Class GoogleAnalyticsTest
- *
- * @package Tests\Extractors
+ * Tests GoogleAnalytics.
  */
 class GoogleAnalyticsTest extends TestCase
 {
-
     protected array $input = [];
 
     protected array $options = [
         'startDate' => '2010-11-11',
         'dimensions' => ['ga:date'],
-        'metrics' => [['name' => 'ga:pageviews', 'type' => 'INTEGER']]
+        'metrics' => [['name' => 'ga:pageviews', 'type' => 'INTEGER']],
     ];
 
     /** @test */
-    public function defaultOptions()
+    public function defaultOptions(): void
     {
         $expected = [
-            new Row(['id' => 1, 'name' => 'John Doe', 'email' => 'johndoe@email.com']),
-            new Row(['id' => 2, 'name' => 'Jane Doe', 'email' => 'janedoe@email.com']),
+            new Row(['id' => '1', 'name' => 'John Doe', 'email' => 'johndoe@email.com']),
+            new Row(['id' => '2', 'name' => 'Jane Doe', 'email' => 'janedoe@email.com']),
         ];
 
         $profile = $this->prophesize(\Google_Service_Analytics_ProfileSummary::class);

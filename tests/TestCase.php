@@ -16,31 +16,28 @@ use Wizaplace\Etl\Loaders\Loader;
 use Wizaplace\Etl\Transformers\Transformer;
 
 /**
- * Class TestCase
- *
- * @package Tests
+ * Base class for PHP-ETL tests.
  */
 abstract class TestCase extends BaseTestCase
 {
-
     /**
-     * @param $step
-     * @param $data
+     * @param Transformer|Loader $step
+     * @param array              $data
      */
-    protected function execute($step, $data)
+    protected function execute($step, $data): void
     {
+        $step->initialize();
+
         if ($step instanceof Transformer) {
-            $method = 'transform';
+            foreach ($data as $row) {
+                $step->transform($row);
+            }
         }
 
         if ($step instanceof Loader) {
-            $method = 'load';
-        }
-
-        $step->initialize();
-
-        foreach ($data as $row) {
-            $step->$method($row);
+            foreach ($data as $row) {
+                $step->load($row);
+            }
         }
 
         $step->finalize();

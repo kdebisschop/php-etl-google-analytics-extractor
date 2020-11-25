@@ -53,7 +53,14 @@ use Wizaplace\Etl\Row;
  *
  * ### Input
  *
- * {@see GoogleAnalytics::$input}
+ * By default, the input is all the web properties the Google client has access to.
+ * However, an array of property names may be specified to limit the extraction to
+ * a smaller set of properties. (In the example below, property names correspond to
+ * the web site name, but that is not necessarily true for all GA users.)
+ *
+ * ```php
+ * $input = ['www.example.com', 'demo.example.com'];
+ * ```
  *
  * ### Options
  *  - Dimensions (required) {@see GoogleAnalytics::$dimensions}
@@ -66,24 +73,8 @@ class GoogleAnalytics extends Extractor
 {
     private const REPORT_PAGE_SIZE = 1000;
 
-    /**
-     * The input source.
-     *
-     * By default, the input is all the web properties the Google client has access to.
-     * However, an array of property names may be specified to limit the extraction to
-     * a smaller set of properties. (In the example below, property names correspond to
-     * the web site name, but that is not necessarily true for all GA users.)
-     *
-     * ```php
-     * $input = ['www.example.com', 'demo.example.com'];
-     * ```
-     *
-     * @var string[]
-     */
-    protected array $input = [];
-
-    /** @var string[] */
-    protected array $availableOptions = ['startDate', 'endDate', 'views', 'dimensions', 'metrics'];
+    /** @var array */
+    protected $availableOptions = ['startDate', 'endDate', 'views', 'dimensions', 'metrics'];
 
     /**
      * The dimension or dimensions used to group analytics data (frequently "ga:date").
@@ -203,9 +194,6 @@ class GoogleAnalytics extends Extractor
 
             $request = $this->reportRequest($profileSummary->getId());
             $reports = $this->reportingService->reports->batchGet($request);
-            if (empty($reports)) {
-                print_r($request);
-            }
 
             /** @var \Google_Service_AnalyticsReporting_Report $report */
             foreach ($reports as $report) {

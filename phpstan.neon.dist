@@ -3,28 +3,13 @@ parameters:
     level: 6
     paths:
         - src
+        - tests
     checkMissingIterableValueType: false
     checkGenericClassInNonGenericObjectType: false
     ignoreErrors:
         -
-            message: '~^Variable method call on ~'
-            path: src/Database/Query.php
-
+            message: '~^Call to an undefined method Prophecy\\Prophecy\\ObjectProphecy::~'
+            path: tests/Extractors/GoogleAnalyticsTest.php
         -
-            message: '~^Variable method call on ~'
-            path: src/Database/Statement.php
-
-        -
-            message: '~^Variable method call on ~'
-            path: src/Etl.php
-
-        -
-            message: '~^Variable property access on ~'
-            path: src/Row.php
-
-        -
-            message: '~^Variable property access on ~'
-            path: src/Step.php
-        -
-            message: '~^Dynamic call to static method XMLReader::open\(\)\.~'
-            path: src/Extractors\Xml.php
+            message: '~^Access to an undefined property Prophecy\\Prophecy\\ObjectProphecy::~'
+            path: tests/Extractors/GoogleAnalyticsTest.php
