@@ -11,7 +11,6 @@ declare(strict_types=1);
 namespace PhpEtl\GoogleAnalytics\Extractors;
 
 use Google\Exception as GoogleException;
-use Google_Service_AnalyticsReporting as AnalyticsReporting;
 use Wizaplace\Etl\Extractors\Extractor;
 use Wizaplace\Etl\Row;
 
@@ -65,6 +64,8 @@ use Wizaplace\Etl\Row;
  */
 class GoogleAnalytics extends Extractor
 {
+    private const REPORT_PAGE_SIZE = 1000;
+
     /**
      * The input source.
      *
@@ -152,9 +153,9 @@ class GoogleAnalytics extends Extractor
     /** @var string[] */
     private array $metricHeaders;
 
-    private int $reportPageSize = 1000;
+    private \Google_Service_AnalyticsReporting $reportingService;
 
-    private AnalyticsReporting $reportingService;
+    public \Google_Service_AnalyticsReporting_ReportRequest $reportRequest;
 
     private int $clientReqCount = 0;
 
@@ -181,7 +182,7 @@ class GoogleAnalytics extends Extractor
             $client->setAuthConfig($config);
 
             $this->analyticsService = new \Google_Service_Analytics($client);
-            $this->reportingService = new AnalyticsReporting($client);
+            $this->reportingService = new \Google_Service_AnalyticsReporting($client);
         }
     }
 
@@ -191,6 +192,7 @@ class GoogleAnalytics extends Extractor
     public function extract(): \Generator
     {
         $this->validate();
+        $this->reportRequestSetup($this->dimensions, $this->metrics, $this->startDate, $this->endDate);
 
         foreach ($this->getProfiles() as $propertyName => $profileSummary) {
             $this->delay();
@@ -199,7 +201,11 @@ class GoogleAnalytics extends Extractor
                 continue;
             }
 
-            $reports = $this->reportingService->reports->batchGet($this->reportRequest($profileSummary->getId()));
+            $request = $this->reportRequest($profileSummary->getId());
+            $reports = $this->reportingService->reports->batchGet($request);
+            if (empty($reports)) {
+                print_r($request);
+            }
 
             /** @var \Google_Service_AnalyticsReporting_Report $report */
             foreach ($reports as $report) {
@@ -228,7 +234,7 @@ class GoogleAnalytics extends Extractor
     /**
      * Enables dependency injection for the analytics reporting service.
      */
-    public function setReportingSvc(AnalyticsReporting $reportingService): self
+    public function setReportingSvc(\Google_Service_AnalyticsReporting $reportingService): self
     {
         $this->reportingService = $reportingService;
 
@@ -308,51 +314,50 @@ class GoogleAnalytics extends Extractor
         return !isset($this->input) || 0 === count($this->views) || in_array($name, $this->views, true);
     }
 
-    /**
-     * Run a report for a specific configuration and view/profile.
-     */
-    private function reportRequest(string $viewId): \Google_Service_AnalyticsReporting_GetReportsRequest
+    public function reportRequest(string $viewId): \Google_Service_AnalyticsReporting_GetReportsRequest
     {
-        $request = new \Google_Service_AnalyticsReporting_ReportRequest();
+        $this->reportRequest->setViewId($viewId);
 
-        $request->setViewId($viewId);
+        $body = new \Google_Service_AnalyticsReporting_GetReportsRequest();
+        $body->setReportRequests([$this->reportRequest]);
+
+        return $body;
+    }
+
+    public function reportRequestSetup(array $dimensions, array $metrics, string $start, string $end): void
+    {
+        $this->reportRequest = new \Google_Service_AnalyticsReporting_ReportRequest();
 
         $dateRange = new \Google_Service_AnalyticsReporting_DateRange();
-        $dateRange->setStartDate($this->startDate);
-        $dateRange->setEndDate($this->endDate);
-        $request->setDateRanges($dateRange);
+        $dateRange->setStartDate($start);
+        $dateRange->setEndDate($end);
+        $this->reportRequest->setDateRanges($dateRange);
 
         // Max 7 dimensions.
         $array = [];
-        foreach ($this->dimensions as $dimension) {
+        foreach ($dimensions as $dimension) {
             $reportDimension = new \Google_Service_AnalyticsReporting_Dimension();
             $reportDimension->setName($dimension);
             $array[] = $reportDimension;
         }
-        $request->setDimensions($array);
+        $this->reportRequest->setDimensions($array);
 
-        $request->setDimensionFilterClauses([]);
+        $this->reportRequest->setDimensionFilterClauses([]);
 
         // At least one metric required, max 10.
         $array = [];
-        foreach ($this->metrics as $metric) {
+        foreach ($metrics as $metric) {
             $reportingMetric = new \Google_Service_AnalyticsReporting_Metric();
             $reportingMetric->setExpression($metric['name']);
             $reportingMetric->setAlias(str_replace('ga:', '', $metric['name']));
             $reportingMetric->setFormattingType($metric['type']);
             $array[] = $reportingMetric;
         }
-        $request->setMetrics($array);
+        $this->reportRequest->setMetrics($array);
 
-        // Default 1000, max 100000.
-        $request->setPageSize($this->reportPageSize);
+        $this->reportRequest->setPageSize(self::REPORT_PAGE_SIZE);
 
-        $request->setIncludeEmptyRows(true);
-
-        $body = new \Google_Service_AnalyticsReporting_GetReportsRequest();
-        $body->setReportRequests([$request]);
-
-        return $body;
+        $this->reportRequest->setIncludeEmptyRows(true);
     }
 
     /**

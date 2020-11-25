@@ -9,10 +9,10 @@
 
 declare(strict_types=1);
 
-namespace Tests\Extractors;
+namespace PhpEtl\GoogleAnalytics\Tests\Extractors;
 
-use Tests;
-use Wizaplace\Etl\Extractors\GoogleAnalytics;
+use PhpEtl\GoogleAnalytics\Tests\TestCase;
+use PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics;
 use Wizaplace\Etl\Row;
 
 /**
@@ -22,9 +22,10 @@ use Wizaplace\Etl\Row;
  */
 class GoogleAnalyticsTest extends TestCase
 {
-    protected $input = [];
 
-    protected $options = [
+    protected array $input = [];
+
+    protected array $options = [
         'startDate' => '2010-11-11',
         'dimensions' => ['ga:date'],
         'metrics' => [['name' => 'ga:pageviews', 'type' => 'INTEGER']]
@@ -58,17 +59,31 @@ class GoogleAnalyticsTest extends TestCase
         $analyticsService = $this->prophesize(\Google_Service_Analytics::class);
         $analyticsService->management_accountSummaries = $mgmtAcctSummary->reveal();
 
-
         $extractor = new GoogleAnalytics();
-        $extractor->setAnalyticsSvc($analyticsService->reveal())
-            ->setReportingSvc($this->getReportingService()->reveal());
         $extractor->input($this->input);
         $extractor->options($this->options);
+        $extractor->reportRequestSetup(
+            $this->options['dimensions'],
+            $this->options['metrics'],
+            $this->options['startDate'],
+            date('Y-m-d', strtotime('-1 day'))
+        );
+
+        $resourceReports = $this->prophesize(\Google_Service_AnalyticsReporting_Resource_Reports::class);
+        $reportRequest = $extractor->reportRequest('default');
+        print_r($reportRequest);
+        $resourceReports->batchGet($reportRequest)->shouldBeCalled()->willReturn($this->getReportsResponse());
+
+        $reportingService = $this->prophesize(\Google_Service_AnalyticsReporting::class);
+        $reportingService->reports = $resourceReports->reveal();
+
+        $extractor->setAnalyticsSvc($analyticsService->reveal())
+            ->setReportingSvc($reportingService->reveal());
 
         static::assertEquals($expected, iterator_to_array($extractor->extract()));
     }
 
-    private function getReportingService()
+    private function getReportsResponse(): \Google_Service_AnalyticsReporting_GetReportsResponse
     {
         $columnHeader = new \Google_Service_AnalyticsReporting_ColumnHeader();
         $columnHeader->setDimensions(['ga:date']);
@@ -95,12 +110,6 @@ class GoogleAnalyticsTest extends TestCase
         $getRptsResponse = $this->prophesize(\Google_Service_AnalyticsReporting_GetReportsResponse::class);
         $getRptsResponse->getReports()->willReturn([$report->reveal()]);
 
-        $resourceReports = $this->prophesize(\Google_Service_AnalyticsReporting_Resource_Reports::class);
-        $resourceReports->batchGet(static::any())->shouldBeCalled()->willReturn($getRptsResponse->reveal());
-
-        $reportingService = $this->prophesize(\Google_Service_AnalyticsReporting::class);
-        $reportingService->reports = $resourceReports->reveal();
-
-        return $reportingService;
+        return $getRptsResponse->reveal();
     }
 }
