@@ -193,10 +193,9 @@ class GoogleAnalytics extends Extractor
             }
 
             $request = $this->reportRequest($profileSummary->getId());
-            $reports = $this->reportingService->reports->batchGet($request);
-
+            $response = $this->reportingService->reports->batchGet($request);
             /** @var \Google_Service_AnalyticsReporting_Report $report */
-            foreach ($reports as $report) {
+            foreach ($response as $report) {
                 $this->setHeaders($report);
                 $rows = $report->getData()->getRows();
                 foreach ($rows as $row) {
@@ -315,36 +314,11 @@ class GoogleAnalytics extends Extractor
     public function reportRequestSetup(array $dimensions, array $metrics, string $start, string $end): void
     {
         $this->reportRequest = new \Google_Service_AnalyticsReporting_ReportRequest();
-
-        $dateRange = new \Google_Service_AnalyticsReporting_DateRange();
-        $dateRange->setStartDate($start);
-        $dateRange->setEndDate($end);
-        $this->reportRequest->setDateRanges($dateRange);
-
-        // Max 7 dimensions.
-        $array = [];
-        foreach ($dimensions as $dimension) {
-            $reportDimension = new \Google_Service_AnalyticsReporting_Dimension();
-            $reportDimension->setName($dimension);
-            $array[] = $reportDimension;
-        }
-        $this->reportRequest->setDimensions($array);
-
+        $this->reportRequest->setDateRanges(Helper::dateRange($start, $end));
+        $this->reportRequest->setDimensions(Helper::dimensions($dimensions));
         $this->reportRequest->setDimensionFilterClauses([]);
-
-        // At least one metric required, max 10.
-        $array = [];
-        foreach ($metrics as $metric) {
-            $reportingMetric = new \Google_Service_AnalyticsReporting_Metric();
-            $reportingMetric->setExpression($metric['name']);
-            $reportingMetric->setAlias(str_replace('ga:', '', $metric['name']));
-            $reportingMetric->setFormattingType($metric['type']);
-            $array[] = $reportingMetric;
-        }
-        $this->reportRequest->setMetrics($array);
-
-        $this->reportRequest->setPageSize(self::REPORT_PAGE_SIZE);
-
+        $this->reportRequest->setMetrics(Helper::metrics($metrics));
+        $this->reportRequest->setPageSize(Helper::REPORT_PAGE_SIZE);
         $this->reportRequest->setIncludeEmptyRows(true);
     }
 

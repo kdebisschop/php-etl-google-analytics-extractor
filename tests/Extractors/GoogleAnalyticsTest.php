@@ -1,9 +1,8 @@
 <?php
 
 /**
- * @author      Wizacha DevTeam <dev@wizacha.com>
- * @copyright   Copyright (c) Wizacha
- * @copyright   Copyright (c) Leonardo Marquine
+ * @author      Karl DeBisschop <kdebisschop@gmail.com>
+ * @copyright   Copyright (c) Karl DeBisschop
  * @license     MIT
  */
 
@@ -11,9 +10,9 @@ declare(strict_types=1);
 
 namespace PhpEtl\GoogleAnalytics\Tests\Extractors;
 
+use Google_Service_AnalyticsReporting_GetReportsResponse as GetReportsResponse;
 use PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics;
 use PhpEtl\GoogleAnalytics\Tests\TestCase;
-use Wizaplace\Etl\Row;
 
 /**
  * Tests GoogleAnalytics.
@@ -25,17 +24,104 @@ class GoogleAnalyticsTest extends TestCase
     protected array $options = [
         'startDate' => '2010-11-11',
         'dimensions' => ['ga:date'],
-        'metrics' => [['name' => 'ga:pageviews', 'type' => 'INTEGER']],
+        'metrics' => [
+            ['name' => 'ga:pageviews', 'type' => 'INTEGER'],
+            ['name' => 'ga:avgPageLoadTime', 'type' => 'FLOAT'],
+            ['name' => 'ga:avgSessionDuration', 'type' => 'TIME'],
+        ],
     ];
+
+    private array $dimensionHeaders;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->dimensionHeaders = $this->options['dimensions'];
+    }
 
     /** @test */
     public function defaultOptions(): void
     {
         $expected = [
-            new Row(['id' => '1', 'name' => 'John Doe', 'email' => 'johndoe@email.com']),
-            new Row(['id' => '2', 'name' => 'Jane Doe', 'email' => 'janedoe@email.com']),
+            [
+                'ga:date' => '2020-11-11',
+                'ga:pageviews' => 2,
+                'ga:avgPageLoadTime' => 2.2,
+                'ga:avgSessionDuration' => 2200,
+                'property' => 'www.example.com',
+                'summary' => 'All Data',
+            ],
+            [
+                'ga:date' => '2020-11-12',
+                'ga:pageviews' => 3,
+                'ga:avgPageLoadTime' => 3.3,
+                'ga:avgSessionDuration' => 3300,
+                'property' => 'www.example.com',
+                'summary' => 'All Data',
+            ],
+            [
+                'ga:date' => '2020-11-13',
+                'ga:pageviews' => 5,
+                'ga:avgPageLoadTime' => 5.5,
+                'ga:avgSessionDuration' => 5500,
+                'property' => 'www.example.com',
+                'summary' => 'All Data',
+            ],
         ];
+        $extractor = new GoogleAnalytics();
+        $extractor->input($this->input);
+        $extractor->options($this->options);
+        $extractor->setAnalyticsSvc($this->mockAnalyticsService())
+            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
 
+        $i = 0;
+        /** @var \Wizaplace\Etl\Row $row */
+        foreach ($extractor->extract() as $row) {
+            static::assertEquals($expected[$i++], ($row->toArray()));
+        }
+    }
+
+    private function mockReportRow(array $dimensions, array $values): \Google_Service_AnalyticsReporting_ReportRow
+    {
+        $row = new \Google_Service_AnalyticsReporting_ReportRow();
+        $row->setDimensions($dimensions);
+        $metrics = new \Google_Service_AnalyticsReporting_DateRangeValues();
+        $metrics->setValues($values);
+        $row->setMetrics([$metrics]);
+
+        return $row;
+    }
+
+    private function mockReport(): \Google_Service_AnalyticsReporting_Report
+    {
+        $report = new \Google_Service_AnalyticsReporting_Report();
+        $reportData = new \Google_Service_AnalyticsReporting_ReportData();
+        $rows = [
+            $this->mockReportRow(['2020-11-11'], [2, 2.2, 2200]),
+            $this->mockReportRow(['2020-11-12'], [3, 3.3, 3300]),
+            $this->mockReportRow(['2020-11-13'], [5, 5.5, 5500]),
+        ];
+        $reportData->setRows($rows);
+        $report->setData($reportData);
+        $columnHeader = new \Google_Service_AnalyticsReporting_ColumnHeader();
+        $columnHeader->setDimensions($this->dimensionHeaders);
+        $metricHeader = new \Google_Service_AnalyticsReporting_MetricHeader();
+        $metricHeaderEntries = [];
+        foreach ($this->options['metrics'] as $metric) {
+            $metricHeaderEntry = new \Google_Service_AnalyticsReporting_MetricHeaderEntry();
+            $metricHeaderEntry->setName($metric['name']);
+            $metricHeaderEntry->setType($metric['type']);
+            $metricHeaderEntries[] = $metricHeaderEntry;
+        }
+        $metricHeader->setMetricHeaderEntries($metricHeaderEntries);
+        $columnHeader->setMetricHeader($metricHeader);
+        $report->setColumnHeader($columnHeader);
+
+        return $report;
+    }
+
+    private function mockAnalyticsService(): \Google_Service_Analytics
+    {
         $profile = $this->prophesize(\Google_Service_Analytics_ProfileSummary::class);
         $profile->getId()->willReturn('12345');
         $profile->getName()->willReturn('All Data');
@@ -56,57 +142,26 @@ class GoogleAnalyticsTest extends TestCase
         $analyticsService = $this->prophesize(\Google_Service_Analytics::class);
         $analyticsService->management_accountSummaries = $mgmtAcctSummary->reveal();
 
-        $extractor = new GoogleAnalytics();
-        $extractor->input($this->input);
-        $extractor->options($this->options);
-        $extractor->reportRequestSetup(
-            $this->options['dimensions'],
-            $this->options['metrics'],
-            $this->options['startDate'],
-            date('Y-m-d', strtotime('-1 day'))
-        );
-
-        $resourceReports = $this->prophesize(\Google_Service_AnalyticsReporting_Resource_Reports::class);
-        $reportRequest = $extractor->reportRequest('default');
-        print_r($reportRequest);
-        $resourceReports->batchGet($reportRequest)->shouldBeCalled()->willReturn($this->getReportsResponse());
-
-        $reportingService = $this->prophesize(\Google_Service_AnalyticsReporting::class);
-        $reportingService->reports = $resourceReports->reveal();
-
-        $extractor->setAnalyticsSvc($analyticsService->reveal())
-            ->setReportingSvc($reportingService->reveal());
-
-        static::assertEquals($expected, iterator_to_array($extractor->extract()));
+        return $analyticsService->reveal();
     }
 
-    private function getReportsResponse(): \Google_Service_AnalyticsReporting_GetReportsResponse
+    private function mockReportResponse(): GetReportsResponse
     {
-        $columnHeader = new \Google_Service_AnalyticsReporting_ColumnHeader();
-        $columnHeader->setDimensions(['ga:date']);
-        $headerEntry = new \Google_Service_AnalyticsReporting_MetricHeaderEntry();
-        $headerEntry->setName('ga:pageviews');
-        $headerEntry->setType('INTEGER');
-        $header = new \Google_Service_AnalyticsReporting_MetricHeader();
-        $header->setMetricHeaderEntries([$headerEntry]);
-        $columnHeader->setMetricHeader($header);
+        $response = new GetReportsResponse();
+        $response->setReports([$this->mockReport()]);
 
-        $row = $this->prophesize(\Google_Service_AnalyticsReporting_ReportRow::class);
-        $row->getDimensions()->willReturn(['2020-11-11']);
-        $metrics = new \Google_Service_AnalyticsReporting_DateRangeValues();
-        $metrics->setValues(100);
-        $row->getMetrics()->willReturn([$metrics]);
+        return $response;
+    }
 
-        $reportData = $this->prophesize(\Google_Service_AnalyticsReporting_ReportData::class);
-        $reportData->getRows()->willReturn([$row->reveal()]);
+    private function mockReportingService(GetReportsResponse $response): \Google_Service_AnalyticsReporting
+    {
+        $mock = $this->createMock(\Google_Service_AnalyticsReporting_Resource_Reports::class);
+        $mock->method('batchGet')->willReturn($response);
 
-        $report = $this->prophesize(\Google_Service_AnalyticsReporting_Report::class);
-        $report->getColumnHeader()->willReturn();
-        $report->getData()->willReturn();
+        $client = $this->prophesize(\Google_Client::class);
+        $reportingService = new \Google_Service_AnalyticsReporting($client->reveal());
+        $reportingService->reports = $mock;
 
-        $getRptsResponse = $this->prophesize(\Google_Service_AnalyticsReporting_GetReportsResponse::class);
-        $getRptsResponse->getReports()->willReturn([$report->reveal()]);
-
-        return $getRptsResponse->reveal();
+        return $reportingService;
     }
 }
