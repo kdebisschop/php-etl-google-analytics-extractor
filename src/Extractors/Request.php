@@ -13,7 +13,7 @@ namespace PhpEtl\GoogleAnalytics\Extractors;
 /**
  * Provides some static methods that can be used to in Extractor code and in tests.
  */
-class Helper
+class Request
 {
     public const REPORT_PAGE_SIZE = 1000;
 

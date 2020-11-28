@@ -79,7 +79,7 @@ class GoogleAnalytics extends Extractor
     /**
      * The dimension or dimensions used to group analytics data (frequently "ga:date").
      *
-     * ```pho
+     * ```php
      * $options = ['dimensions' => ['ga:date']];
      * ```
      *
@@ -146,7 +146,7 @@ class GoogleAnalytics extends Extractor
 
     private \Google_Service_AnalyticsReporting $reportingService;
 
-    public \Google_Service_AnalyticsReporting_ReportRequest $reportRequest;
+    private \Google_Service_AnalyticsReporting_ReportRequest $reportRequest;
 
     private int $clientReqCount = 0;
 
@@ -159,11 +159,11 @@ class GoogleAnalytics extends Extractor
      * setters for analytics service and analytics reporting service must be
      * used to inject the required dependencies.
      *
-     * @param string|null $config The configuration json file
+     * @param string $config The configuration json file
      *
      * @throws GoogleException
      */
-    public function __construct(?string $config = '')
+    public function __construct(string $config = '')
     {
         if ('' !== $config && file_exists($config)) {
             $client = new \Google_Client();
@@ -301,7 +301,10 @@ class GoogleAnalytics extends Extractor
         return !isset($this->input) || 0 === count($this->views) || in_array($name, $this->views, true);
     }
 
-    public function reportRequest(string $viewId): \Google_Service_AnalyticsReporting_GetReportsRequest
+    /**
+     * Creates GetReportsRequest object with current viewID and the shared request parameters set earlier.
+     */
+    private function reportRequest(string $viewId): \Google_Service_AnalyticsReporting_GetReportsRequest
     {
         $this->reportRequest->setViewId($viewId);
 
@@ -311,14 +314,19 @@ class GoogleAnalytics extends Extractor
         return $body;
     }
 
-    public function reportRequestSetup(array $dimensions, array $metrics, string $start, string $end): void
+    /**
+     * Sets general parameters for report requests.
+     *
+     * Our requests only differ in having a different viewID, so we only need to set these once.
+     */
+    private function reportRequestSetup(array $dimensions, array $metrics, string $start, string $end): void
     {
         $this->reportRequest = new \Google_Service_AnalyticsReporting_ReportRequest();
-        $this->reportRequest->setDateRanges(Helper::dateRange($start, $end));
-        $this->reportRequest->setDimensions(Helper::dimensions($dimensions));
+        $this->reportRequest->setDateRanges(Request::dateRange($start, $end));
+        $this->reportRequest->setDimensions(Request::dimensions($dimensions));
         $this->reportRequest->setDimensionFilterClauses([]);
-        $this->reportRequest->setMetrics(Helper::metrics($metrics));
-        $this->reportRequest->setPageSize(Helper::REPORT_PAGE_SIZE);
+        $this->reportRequest->setMetrics(Request::metrics($metrics));
+        $this->reportRequest->setPageSize(Request::REPORT_PAGE_SIZE);
         $this->reportRequest->setIncludeEmptyRows(true);
     }
 
