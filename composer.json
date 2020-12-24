@@ -15,7 +15,7 @@
     "require": {
         "php": "~7.4",
         "google/apiclient": "^2.8",
-        "wizaplace/php-etl": "~1.2.0"
+        "wizaplace/php-etl": "~1.2"
     },
     "autoload": {
         "psr-4": {
