@@ -38,12 +38,11 @@
         }
     },
     "scripts": {
-        "scan": [
-            "php-cs-fixer --dry-run -v --allow-risky=yes fix",
-            "phpcs",
-            "phpstan --memory-limit=256M analyze"
-        ],
+        "fixer": "php-cs-fixer --dry-run -v --allow-risky=yes fix",
+        "cs": "phpcs -p -s",
+        "analyze": "phpstan --memory-limit=256M analyze",
         "test": "phpunit",
+        "scan": ["@fixer", "@cs", "@analyze"],
         "check": ["@scan", "@test"]
     },
     "minimum-stability": "dev",
