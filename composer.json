@@ -13,9 +13,9 @@
         "sort-packages": true
     },
     "require": {
-        "php": "~7.4",
+        "php": "^7.4 || ^8.0",
         "google/apiclient": "^2.8",
-        "wizaplace/php-etl": "~1.2"
+        "wizaplace/php-etl": "^1.3"
     },
     "autoload": {
         "psr-4": {
@@ -23,12 +23,12 @@
         }
     },
     "require-dev": {
-        "friendsofphp/php-cs-fixer": "^2.16",
-        "infection/infection": "^0.15.3",
+        "friendsofphp/php-cs-fixer": "^2.17",
+        "infection/infection": "^0.20.2",
         "phpstan/extension-installer": "^1.0",
-        "phpstan/phpstan": "^0.12.18",
-        "phpstan/phpstan-deprecation-rules": "^0.12.2",
-        "phpstan/phpstan-strict-rules": "^0.12.2",
+        "phpstan/phpstan": "^0.12",
+        "phpstan/phpstan-deprecation-rules": "^0.12",
+        "phpstan/phpstan-strict-rules": "^0.12",
         "phpunit/phpunit": "^8.5",
         "squizlabs/php_codesniffer": "^3.5"
     },
@@ -38,12 +38,13 @@
         }
     },
     "scripts": {
-        "scan": [
-            "php-cs-fixer --dry-run -v --allow-risky=yes fix",
-            "phpcs",
-            "phpstan --memory-limit=256M analyze"
-        ],
+        "fixer": "php-cs-fixer --dry-run -v --allow-risky=yes fix",
+        "cs": "phpcs -p -s",
+        "analyze": "phpstan --memory-limit=256M analyze",
         "test": "phpunit",
+        "coverage": "phpunit --coverage-clover coverage.xml --log-junit junit.xml",
+        "infection": "infection",
+        "scan": ["@fixer", "@cs", "@analyze"],
         "check": ["@scan", "@test"]
     },
     "minimum-stability": "dev",
