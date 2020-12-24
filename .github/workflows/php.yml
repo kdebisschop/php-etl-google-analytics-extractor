@@ -50,8 +50,9 @@ jobs:
       - name: Run test suite
         run: composer run-script coverage
 
-      - name: Run test suite
-        run: composer run-script infection
+#      - name: Run test suite
+#        if
+#        run: composer run-script infection
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
