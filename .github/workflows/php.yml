@@ -39,7 +39,7 @@ jobs:
         run: composer install --prefer-dist --no-progress --no-suggest
 
       - name: Scan with PHP CS Fixer
-        run: composer run-script fixer
+        run: PHP_CS_FIXER_IGNORE_ENV=1 composer run-script fixer
 
       - name: Scan with test PHP Code Sniffer
         run: composer run-script cs
