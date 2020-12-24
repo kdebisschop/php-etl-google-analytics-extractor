@@ -5,6 +5,10 @@ on: push
 jobs:
   build:
 
+    strategy:
+      matrix:
+        php: [ 7.4, 8.0 ]
+
     runs-on: ubuntu-latest
 
     steps:
