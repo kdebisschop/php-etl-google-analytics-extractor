@@ -5,3 +5,5 @@
 /.phpdoc/
 /.phpunit.result.cache
 /.php_cs.cache
+/coverage.xml
+/junit.xml
