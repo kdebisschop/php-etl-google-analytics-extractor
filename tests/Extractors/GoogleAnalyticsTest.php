@@ -19,15 +19,20 @@ use PhpEtl\GoogleAnalytics\Tests\TestCase;
  */
 class GoogleAnalyticsTest extends TestCase
 {
+    private const GA_DATE = 'ga:date';
+    private const GA_PAGE_VIEWS = 'ga:pageviews';
+    private const GA_AVG_PAGE_LOAD_TIME = 'ga:avgPageLoadTime';
+    private const GA_AVG_SESSION_DURATION = 'ga:avgSessionDuration';
+
     protected array $input = [];
 
     protected array $options = [
         'startDate' => '2010-11-11',
-        'dimensions' => ['ga:date'],
+        'dimensions' => [self::GA_DATE],
         'metrics' => [
-            ['name' => 'ga:pageviews', 'type' => 'INTEGER'],
-            ['name' => 'ga:avgPageLoadTime', 'type' => 'FLOAT'],
-            ['name' => 'ga:avgSessionDuration', 'type' => 'TIME'],
+            ['name' => self::GA_PAGE_VIEWS, 'type' => 'INTEGER'],
+            ['name' => self::GA_AVG_PAGE_LOAD_TIME, 'type' => 'FLOAT'],
+            ['name' => self::GA_AVG_SESSION_DURATION, 'type' => 'TIME'],
         ],
     ];
 
@@ -43,30 +48,9 @@ class GoogleAnalyticsTest extends TestCase
     public function defaultOptions(): void
     {
         $expected = [
-            [
-                'ga:date' => '2020-11-11',
-                'ga:pageviews' => 2,
-                'ga:avgPageLoadTime' => 2.2,
-                'ga:avgSessionDuration' => 2200,
-                'property' => 'www.example.com',
-                'summary' => 'All Data',
-            ],
-            [
-                'ga:date' => '2020-11-12',
-                'ga:pageviews' => 3,
-                'ga:avgPageLoadTime' => 3.3,
-                'ga:avgSessionDuration' => 3300,
-                'property' => 'www.example.com',
-                'summary' => 'All Data',
-            ],
-            [
-                'ga:date' => '2020-11-13',
-                'ga:pageviews' => 5,
-                'ga:avgPageLoadTime' => 5.5,
-                'ga:avgSessionDuration' => 5500,
-                'property' => 'www.example.com',
-                'summary' => 'All Data',
-            ],
+            GoogleAnalyticsTest::oneRow('2020-11-11', 2, 2.2, 2200),
+            GoogleAnalyticsTest::oneRow('2020-11-12', 3, 3.3, 3300),
+            GoogleAnalyticsTest::oneRow('2020-11-13', 5, 5.5, 5500),
         ];
         $extractor = new GoogleAnalytics();
         $extractor->input($this->input);
@@ -79,6 +63,18 @@ class GoogleAnalyticsTest extends TestCase
         foreach ($extractor->extract() as $row) {
             static::assertEquals($expected[$i++], ($row->toArray()));
         }
+    }
+
+    private static function oneRow(string $date, int $pages, float $time, int $duration): array
+    {
+        return [
+            self::GA_DATE => $date,
+            self::GA_PAGE_VIEWS => $pages,
+            self::GA_AVG_PAGE_LOAD_TIME => $time,
+            self::GA_AVG_SESSION_DURATION => $duration,
+            'property' => 'www.example.com',
+            'summary' => 'All Data',
+        ];
     }
 
     private function mockReportRow(array $dimensions, array $values): \Google_Service_AnalyticsReporting_ReportRow
