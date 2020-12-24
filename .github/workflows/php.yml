@@ -15,6 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-versions }}
+          ini-values: post_max_size=256M, log_errors=1
+          coverage: pcov
+
       - name: Validate composer.json and composer.lock
         run: composer validate
 
