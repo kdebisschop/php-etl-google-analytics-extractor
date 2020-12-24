@@ -135,7 +135,6 @@ class GoogleAnalytics extends Extractor
      */
     protected array $views = [];
 
-    /** @var \Google_Service_Analytics */
     private \Google_Service_Analytics $analyticsService;
 
     /** @var string[] */
