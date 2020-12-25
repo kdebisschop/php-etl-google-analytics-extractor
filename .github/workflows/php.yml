@@ -56,7 +56,9 @@ jobs:
         run: composer run-script analyze
 
       - name: Run test suite
-        run: composer run-script test -- --coverage-clover=clover.xml --log-junit=junit.xml
+        run: |
+          composer run-script test -- --coverage-clover=clover.xml --log-junit=junit.xml
+          sed 's~/home/runner/work/php-etl-google-analytics-extractor/php-etl-google-analytics-extractor/~~' clover.xml > coverage.xml
 
       - name: Estimate coverage
         if: ${{ matrix.php-version == '7.4' }}
