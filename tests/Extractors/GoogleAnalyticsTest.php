@@ -38,6 +38,8 @@ class GoogleAnalyticsTest extends TestCase
 
     private array $dimensionHeaders;
 
+    private string $profile = 'All Data';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -48,9 +50,9 @@ class GoogleAnalyticsTest extends TestCase
     public function defaultOptions(): void
     {
         $expected = [
-            GoogleAnalyticsTest::oneRow('2020-11-11', 2, 2.2, 2200),
-            GoogleAnalyticsTest::oneRow('2020-11-12', 3, 3.3, 3300),
-            GoogleAnalyticsTest::oneRow('2020-11-13', 5, 5.5, 5500),
+            $this->oneRow('2020-11-11', 2, 2.2, 2200),
+            $this->oneRow('2020-11-12', 3, 3.3, 3300),
+            $this->oneRow('2020-11-13', 5, 5.5, 5500),
         ];
         $extractor = new GoogleAnalytics();
         $extractor->input($this->input);
@@ -65,7 +67,87 @@ class GoogleAnalyticsTest extends TestCase
         }
     }
 
-    private static function oneRow(string $date, int $pages, float $time, int $duration): array
+    /** @test */
+    public function skipView(): void
+    {
+        $extractor = new GoogleAnalytics();
+        $extractor->input($this->input);
+        $this->options['views'] = ['www.example.info'];
+        $extractor->options($this->options);
+        $extractor->setAnalyticsSvc($this->mockAnalyticsService())
+            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
+
+        $i = 0;
+        while ($extractor->extract()->valid()) {
+            $extractor->extract()->next();
+            ++$i;
+        }
+        static::assertEquals(0, $i);
+    }
+
+    public function skipProfile(): void
+    {
+        $extractor = new GoogleAnalytics();
+        $extractor->input($this->input);
+        $this->profile = 'Some Data';
+        $extractor->options($this->options);
+        $extractor->setAnalyticsSvc($this->mockAnalyticsService())
+            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
+
+        $i = 0;
+        while ($extractor->extract()->valid()) {
+            $extractor->extract()->next();
+            ++$i;
+        }
+        static::assertEquals(0, $i);
+    }
+
+    /** @test */
+    public function noDimension(): void
+    {
+        $extractor = new GoogleAnalytics();
+        unset($this->options['dimensions']);
+        static::expectException(\InvalidArgumentException::class);
+        $extractor->options($this->options);
+    }
+
+    /** @test */
+    public function tooManyDimensions(): void
+    {
+        $extractor = new GoogleAnalytics();
+        $this->options['dimensions'] = ['1', '2', '3', '4', '5', '6', '7', '8'];
+        static::expectException(\InvalidArgumentException::class);
+        $extractor->options($this->options);
+    }
+
+    /** @test */
+    public function noMetrics(): void
+    {
+        $extractor = new GoogleAnalytics();
+        unset($this->options['metrics']);
+        static::expectException(\InvalidArgumentException::class);
+        $extractor->options($this->options);
+    }
+
+    /** @test */
+    public function tooManyMetrics(): void
+    {
+        $extractor = new GoogleAnalytics();
+        $this->options['metrics'] = range(1, 11);
+        static::expectException(\InvalidArgumentException::class);
+        $extractor->options($this->options);
+    }
+
+    /** @test */
+    public function noStartDate(): void
+    {
+        $extractor = new GoogleAnalytics();
+        unset($this->options['startDate']);
+        static::expectException(\InvalidArgumentException::class);
+        $extractor->options($this->options);
+    }
+
+    private function oneRow(string $date, int $pages, float $time, int $duration): array
     {
         return [
             self::GA_DATE => $date,
@@ -73,7 +155,7 @@ class GoogleAnalyticsTest extends TestCase
             self::GA_AVG_PAGE_LOAD_TIME => $time,
             self::GA_AVG_SESSION_DURATION => $duration,
             'property' => 'www.example.com',
-            'summary' => 'All Data',
+            'summary' => $this->profile,
         ];
     }
 
