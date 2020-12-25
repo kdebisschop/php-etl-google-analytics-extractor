@@ -13,6 +13,7 @@ namespace PhpEtl\GoogleAnalytics\Extractors;
 use Google\Exception as GoogleException;
 use Wizaplace\Etl\Extractors\Extractor;
 use Wizaplace\Etl\Row;
+use Wizaplace\Etl\Step;
 
 /**
  * Extract statistics from multiple properties in GoogleAnalytics.
@@ -176,12 +177,19 @@ class GoogleAnalytics extends Extractor
         }
     }
 
+    public function options(array $options): Step
+    {
+        parent::options($options);
+        $this->validate();
+
+        return $this;
+    }
+
     /**
      * Extract data from the input.
      */
     public function extract(): \Generator
     {
-        $this->validate();
         $this->reportRequestSetup($this->dimensions, $this->metrics, $this->startDate, $this->endDate);
 
         foreach ($this->getProfiles() as $propertyName => $profileSummary) {
@@ -247,6 +255,7 @@ class GoogleAnalytics extends Extractor
             $delay = 1 + (mt_rand() / mt_getrandmax() - 0.5);
             usleep((int) (1000000 * $delay));
         }
+
         $this->clientReqCount++;
     }
 
