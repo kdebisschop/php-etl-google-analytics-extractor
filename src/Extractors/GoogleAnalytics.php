@@ -181,6 +181,7 @@ class GoogleAnalytics extends Extractor
     {
         parent::options($options);
         $this->validate();
+
         return $this;
     }
 
@@ -255,7 +256,7 @@ class GoogleAnalytics extends Extractor
             usleep((int) (1000000 * $delay));
         }
 
-        ++$this->clientReqCount;
+        $this->clientReqCount++;
     }
 
     /**

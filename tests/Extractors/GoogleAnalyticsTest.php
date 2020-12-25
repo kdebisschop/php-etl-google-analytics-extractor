@@ -80,7 +80,7 @@ class GoogleAnalyticsTest extends TestCase
         $i = 0;
         while ($extractor->extract()->valid()) {
             $extractor->extract()->next();
-            ++$i;
+            $i++;
         }
         static::assertEquals(0, $i);
     }
@@ -97,7 +97,7 @@ class GoogleAnalyticsTest extends TestCase
         $i = 0;
         while ($extractor->extract()->valid()) {
             $extractor->extract()->next();
-            ++$i;
+            $i++;
         }
         static::assertEquals(0, $i);
     }
