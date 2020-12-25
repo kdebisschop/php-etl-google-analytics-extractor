@@ -56,7 +56,7 @@ jobs:
         run: composer run-script analyze
 
       - name: Run test suite
-        run: composer run-script coverage --coverage-clover /github/workspace/clover.xml --log-junit /github/workspace/junit.xml
+        run: composer run-script test -- --coverage-clover=/github/workspace/clover.xml --log-junit=/github/workspace/junit.xml
 
       - name: Estimate coverage
         if: ${{ matrix.php-version == '7.4' }}
