@@ -42,7 +42,7 @@
         "cs": "phpcs -p -s",
         "analyze": "phpstan --memory-limit=256M analyze",
         "test": "phpunit",
-        "coverage": "phpunit --coverage-clover clover.xml --log-junit junit.xml",
+        "coverage": "phpunit --",
         "infection": "infection",
         "scan": ["@fixer", "@cs", "@analyze"],
         "check": ["@scan", "@test"]
