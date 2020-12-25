@@ -57,7 +57,8 @@ jobs:
 
       - name: Run test suite
         run: |
-          composer run-script test -- --coverage-clover=/github/workspace/clover.xml --log-junit=/github/workspace/junit.xml
+          mkdir reports
+          composer run-script test -- --coverage-clover=clover.xml --log-junit=junit.xml
           pwd
           ls -l
 
