@@ -6,10 +6,3 @@ parameters:
         - tests
     checkMissingIterableValueType: false
     checkGenericClassInNonGenericObjectType: false
-    ignoreErrors:
-        -
-            message: '~^Call to an undefined method Prophecy\\Prophecy\\ObjectProphecy::~'
-            path: tests/Extractors/GoogleAnalyticsTest.php
-        -
-            message: '~^Access to an undefined property Prophecy\\Prophecy\\ObjectProphecy::~'
-            path: tests/Extractors/GoogleAnalyticsTest.php

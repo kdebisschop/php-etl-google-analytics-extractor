@@ -75,7 +75,7 @@ class GoogleAnalytics extends Extractor
     private const REPORT_PAGE_SIZE = 1000;
 
     /** @var array */
-    protected $availableOptions = ['startDate', 'endDate', 'views', 'dimensions', 'metrics'];
+    protected $availableOptions = ['startDate', 'endDate', 'views', 'properties', 'dimensions', 'metrics'];
 
     /**
      * The dimension or dimensions used to group analytics data (frequently "ga:date").
@@ -135,6 +135,17 @@ class GoogleAnalytics extends Extractor
      * @var string[]
      */
     protected array $views = [];
+
+    /**
+     * If specified, properties will limit the specific GA properties to extract.
+     *
+     * ```php
+     * $options = ['properties' => ['All data']];
+     * ```
+     *
+     * @var string[]
+     */
+    protected array $properties = [];
 
     private \Google_Service_Analytics $analyticsService;
 
@@ -256,7 +267,7 @@ class GoogleAnalytics extends Extractor
             usleep((int) (1000000 * $delay));
         }
 
-        $this->clientReqCount++;
+        ++$this->clientReqCount;
     }
 
     /**
@@ -278,15 +289,12 @@ class GoogleAnalytics extends Extractor
         /** @var \Google_Service_Analytics_ProfileSummary[] $profiles */
         $profiles = [];
         $accountSummaries = $this->analyticsService->management_accountSummaries->listManagementAccountSummaries();
-        /** @var \Google_Service_Analytics_AccountSummary $accountSummary */
         foreach ($accountSummaries->getItems() as $accountSummary) {
-            /** @var \Google_Service_Analytics_WebPropertySummary $propertySummary */
             foreach ($accountSummary->getWebProperties() as $propertySummary) {
                 $propertyName = $propertySummary->getName();
-                if (!$this->isWantedProperty($propertyName)) {
-                    continue;
+                if ($this->isWantedProperty($propertyName)) {
+                    $profiles[$propertyName] = $propertySummary->getProfiles()[0];
                 }
-                $profiles[$propertyName] = $propertySummary->getProfiles()[0];
             }
         }
 
@@ -298,7 +306,7 @@ class GoogleAnalytics extends Extractor
      */
     private function isWantedProperty(string $name): bool
     {
-        return !isset($this->input) || 0 === count($this->input) || in_array($name, $this->input, true);
+        return !isset($this->properties) || 0 === count($this->properties) || in_array($name, $this->properties, true);
     }
 
     /**
@@ -306,7 +314,7 @@ class GoogleAnalytics extends Extractor
      */
     private function isWantedView(string $name): bool
     {
-        return !isset($this->input) || 0 === count($this->views) || in_array($name, $this->views, true);
+        return !isset($this->views) || 0 === count($this->views) || in_array($name, $this->views, true);
     }
 
     /**
@@ -345,7 +353,6 @@ class GoogleAnalytics extends Extractor
     {
         $header = $report->getColumnHeader();
         $this->dimensionHeaders = $header->getDimensions();
-        /** @var \Google_Service_AnalyticsReporting_MetricHeaderEntry[] $headerEntries */
         $headerEntries = $header->getMetricHeader()->getMetricHeaderEntries();
         $this->metricHeaders = array_map(
             function (\Google_Service_AnalyticsReporting_MetricHeaderEntry $headerEntry) {

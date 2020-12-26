@@ -40,13 +40,17 @@ class GoogleAnalyticsTest extends TestCase
 
     private string $profile = 'All Data';
 
+    private string $site = 'www.example.com';
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->dimensionHeaders = $this->options['dimensions'];
     }
 
-    /** @test */
+    /**
+     * @test
+     */
     public function defaultOptions(): void
     {
         $expected = [
@@ -67,42 +71,93 @@ class GoogleAnalyticsTest extends TestCase
         }
     }
 
-    /** @test */
+    /**
+     * @test
+     */
+    public function includeView(): void
+    {
+        $extractor = new GoogleAnalytics();
+        $extractor->input($this->input);
+        $this->options['views'] = ['All Data', 'Some Data'];
+        $extractor->options($this->options);
+        $extractor->setAnalyticsSvc($this->mockAnalyticsService())
+            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
+
+        $i = 0;
+        $iterator = $extractor->extract();
+        while ($iterator->valid()) {
+            $iterator->next();
+            ++$i;
+        }
+        static::assertEquals(3, $i);
+    }
+
+    /**
+     * @test
+     */
     public function skipView(): void
     {
         $extractor = new GoogleAnalytics();
         $extractor->input($this->input);
-        $this->options['views'] = ['www.example.info'];
+        $this->options['views'] = ['Some Data'];
         $extractor->options($this->options);
         $extractor->setAnalyticsSvc($this->mockAnalyticsService())
             ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
 
         $i = 0;
-        while ($extractor->extract()->valid()) {
-            $extractor->extract()->next();
-            $i++;
+        $iterator = $extractor->extract();
+        while ($iterator->valid()) {
+            $iterator->next();
+            ++$i;
         }
         static::assertEquals(0, $i);
     }
 
-    public function skipProfile(): void
+    /**
+     * @test
+     */
+    public function includeProperty(): void
     {
         $extractor = new GoogleAnalytics();
         $extractor->input($this->input);
-        $this->profile = 'Some Data';
+        $this->options['properties'] = ['www.example.info', 'www.example.com'];
         $extractor->options($this->options);
         $extractor->setAnalyticsSvc($this->mockAnalyticsService())
             ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
 
         $i = 0;
-        while ($extractor->extract()->valid()) {
-            $extractor->extract()->next();
-            $i++;
+        $iterator = $extractor->extract();
+        while ($iterator->valid()) {
+            $iterator->next();
+            ++$i;
+        }
+        static::assertEquals(3, $i);
+    }
+
+    /**
+     * @test
+     */
+    public function skipProperty(): void
+    {
+        $extractor = new GoogleAnalytics();
+        $extractor->input($this->input);
+        $this->options['properties'] = ['www.example.info', 'www.example.org'];
+        $extractor->options($this->options);
+        $extractor->setAnalyticsSvc($this->mockAnalyticsService())
+            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
+
+        $i = 0;
+        $iterator = $extractor->extract();
+        while ($iterator->valid()) {
+            $iterator->next();
+            ++$i;
         }
         static::assertEquals(0, $i);
     }
 
-    /** @test */
+    /**
+     * @test
+     */
     public function noDimension(): void
     {
         $extractor = new GoogleAnalytics();
@@ -111,7 +166,9 @@ class GoogleAnalyticsTest extends TestCase
         $extractor->options($this->options);
     }
 
-    /** @test */
+    /**
+     * @test
+     */
     public function tooManyDimensions(): void
     {
         $extractor = new GoogleAnalytics();
@@ -120,7 +177,9 @@ class GoogleAnalyticsTest extends TestCase
         $extractor->options($this->options);
     }
 
-    /** @test */
+    /**
+     * @test
+     */
     public function noMetrics(): void
     {
         $extractor = new GoogleAnalytics();
@@ -129,7 +188,9 @@ class GoogleAnalyticsTest extends TestCase
         $extractor->options($this->options);
     }
 
-    /** @test */
+    /**
+     * @test
+     */
     public function tooManyMetrics(): void
     {
         $extractor = new GoogleAnalytics();
@@ -138,7 +199,9 @@ class GoogleAnalyticsTest extends TestCase
         $extractor->options($this->options);
     }
 
-    /** @test */
+    /**
+     * @test
+     */
     public function noStartDate(): void
     {
         $extractor = new GoogleAnalytics();
@@ -154,7 +217,7 @@ class GoogleAnalyticsTest extends TestCase
             self::GA_PAGE_VIEWS => $pages,
             self::GA_AVG_PAGE_LOAD_TIME => $time,
             self::GA_AVG_SESSION_DURATION => $duration,
-            'property' => 'www.example.com',
+            'property' => $this->site,
             'summary' => $this->profile,
         ];
     }
@@ -209,7 +272,7 @@ class GoogleAnalyticsTest extends TestCase
         $propertySummary->getProfiles()->willReturn([$profile->reveal()]);
 
         $accountSummary = $this->prophesize(\Google_Service_Analytics_AccountSummary::class);
-        $accountSummary->getWebProperties()->willReturn([$propertySummary->reveal()]);
+        $accountSummary->getWebProperties()->willReturn([$propertySummary->reveal()], []);
 
         $accountSummaries = $this->prophesize(\Google_Service_Analytics_AccountSummaries::class);
         $accountSummaries->getItems()->willReturn([$accountSummary->reveal()]);
@@ -218,9 +281,10 @@ class GoogleAnalyticsTest extends TestCase
         $mgmtAcctSummary->listManagementAccountSummaries()->willReturn($accountSummaries->reveal());
 
         $analyticsService = $this->prophesize(\Google_Service_Analytics::class);
-        $analyticsService->management_accountSummaries = $mgmtAcctSummary->reveal();
+        $return = $analyticsService->reveal();
+        $return->management_accountSummaries = $mgmtAcctSummary->reveal();
 
-        return $analyticsService->reveal();
+        return $return;
     }
 
     private function mockReportResponse(): GetReportsResponse
