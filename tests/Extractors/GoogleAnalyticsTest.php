@@ -272,7 +272,7 @@ class GoogleAnalyticsTest extends TestCase
         $propertySummary->getProfiles()->willReturn([$profile->reveal()]);
 
         $accountSummary = $this->prophesize(\Google_Service_Analytics_AccountSummary::class);
-        $accountSummary->getWebProperties()->willReturn([$propertySummary->reveal()], []);
+        $accountSummary->getWebProperties()->willReturn([$propertySummary->reveal()]);
 
         $accountSummaries = $this->prophesize(\Google_Service_Analytics_AccountSummaries::class);
         $accountSummaries->getItems()->willReturn([$accountSummary->reveal()]);
