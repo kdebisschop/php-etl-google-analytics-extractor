@@ -78,7 +78,7 @@ class GoogleAnalyticsTest extends TestCase
     {
         $extractor = new GoogleAnalytics();
         $extractor->input($this->input);
-        $this->options['views'] = ['All Data', 'Some Data'];
+        $this->options['views'] = [$this->profile, 'Some Data'];
         $extractor->options($this->options);
         $extractor->setAnalyticsSvc($this->mockAnalyticsService())
             ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
@@ -120,7 +120,7 @@ class GoogleAnalyticsTest extends TestCase
     {
         $extractor = new GoogleAnalytics();
         $extractor->input($this->input);
-        $this->options['properties'] = ['www.example.info', 'www.example.com'];
+        $this->options['properties'] = ['www.example.info', $this->site];
         $extractor->options($this->options);
         $extractor->setAnalyticsSvc($this->mockAnalyticsService())
             ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
@@ -265,10 +265,10 @@ class GoogleAnalyticsTest extends TestCase
     {
         $profile = $this->prophesize(\Google_Service_Analytics_ProfileSummary::class);
         $profile->getId()->willReturn('12345');
-        $profile->getName()->willReturn('All Data');
+        $profile->getName()->willReturn($this->profile);
 
         $propertySummary = $this->prophesize(\Google_Service_Analytics_WebPropertySummary::class);
-        $propertySummary->getName()->willReturn('www.example.com');
+        $propertySummary->getName()->willReturn($this->site);
         $propertySummary->getProfiles()->willReturn([$profile->reveal()]);
 
         $accountSummary = $this->prophesize(\Google_Service_Analytics_AccountSummary::class);
