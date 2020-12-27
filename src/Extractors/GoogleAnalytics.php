@@ -11,6 +11,8 @@ declare(strict_types=1);
 namespace PhpEtl\GoogleAnalytics\Extractors;
 
 use Google\Exception as GoogleException;
+use SebastianBergmann\Timer\Timer;
+use Symfony\Component\Stopwatch\Stopwatch;
 use Wizaplace\Etl\Extractors\Extractor;
 use Wizaplace\Etl\Row;
 use Wizaplace\Etl\Step;
@@ -163,6 +165,8 @@ class GoogleAnalytics extends Extractor
 
     private int $clientReqCount = 0;
 
+    protected int $oneSecond = 1000000;
+
     protected \Google_Service_Analytics $analyticsService;
 
     protected \Google_Service_AnalyticsReporting $reportingService;
@@ -203,10 +207,9 @@ class GoogleAnalytics extends Extractor
         $this->validate();
 
         if (!isset($this->delayFunction)) {
-            // Delay 1 second plus or minus a random jitter to avoid 100 requests per 100 seconds quota exceeded.
+            // Delay 1 second to avoid 100 requests per 100 seconds quota exceeded.
             $this->delayFunction = function (): void {
-                $delay = 1 + (mt_rand() / mt_getrandmax() - 0.5);
-                usleep((int) (1000000 * $delay));
+                usleep($this->oneSecond);
             };
         }
 

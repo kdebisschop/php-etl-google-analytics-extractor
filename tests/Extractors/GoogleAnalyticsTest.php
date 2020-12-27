@@ -81,6 +81,11 @@ class GoogleAnalyticsTest extends TestCase
                 $this->delayFunction = $function;
             }
 
+            public function setDelayTime(): void
+            {
+                $this->oneSecond = 1;
+            }
+
             public function setReportingSvc(\Google_Service_AnalyticsReporting $reportingService): void
             {
                 $this->reportingService = $reportingService;
@@ -128,13 +133,30 @@ class GoogleAnalyticsTest extends TestCase
             return ++$i;
         };
         $this->extractor->options($this->options);
-        $this->extractor->setAnalyticsSvc($this->mockAnalyticsService(50));
+        $this->extractor->setAnalyticsSvc($this->mockAnalyticsService(100));
         $this->extractor->setDelayFunction($function);
         $iterator = $this->extractor->extract();
         while ($iterator->valid()) {
             $iterator->next();
         }
         static::assertEquals(4, call_user_func($function));
+    }
+
+    /**
+     * Test that native delay method runs without error.
+     *
+     * @test
+     */
+    public function delayFunction(): void
+    {
+        $this->extractor->options($this->options);
+        $this->extractor->setDelayTime();
+        $this->extractor->setAnalyticsSvc($this->mockAnalyticsService(100));
+        $iterator = $this->extractor->extract();
+        while ($iterator->valid()) {
+            $iterator->next();
+        }
+        static::assertFalse($iterator->valid());
     }
 
     /**
@@ -364,7 +386,7 @@ class GoogleAnalyticsTest extends TestCase
         return $row;
     }
 
-    private function mockReport(int $rowCount): \Google_Service_AnalyticsReporting_Report
+    private function mockReport(): \Google_Service_AnalyticsReporting_Report
     {
         $report = new \Google_Service_AnalyticsReporting_Report();
         $reportData = new \Google_Service_AnalyticsReporting_ReportData();
@@ -373,9 +395,6 @@ class GoogleAnalyticsTest extends TestCase
             $this->mockReportRow(['2020-11-12'], [3, 3.3, 3300]),
             $this->mockReportRow(['2020-11-13'], [5, 5.5, 5500]),
         ];
-        for ($i = 3; $i < $rowCount; ++$i) {
-            $rows[] = $this->mockReportRow(["2020-11-$i"], [$i, $i, $i]);
-        }
         $reportData->setRows($rows);
         $report->setData($reportData);
         $columnHeader = new \Google_Service_AnalyticsReporting_ColumnHeader();
@@ -412,9 +431,10 @@ class GoogleAnalyticsTest extends TestCase
         $secondProperty = $this->prophesize(\Google_Service_Analytics_WebPropertySummary::class);
         $secondProperty->getName()->willReturn('not-a-site.example.com');
         $secondProperty->getProfiles()->willReturn([$secondProfile->reveal(), $profile->reveal()]);
+
         $properties = [$propertySummary->reveal(), $secondProperty->reveal()];
         for ($i = 0; $i < $sites; ++$i) {
-            $properties[] = $secondProperty->reveal();
+            $properties[] = $propertySummary->reveal();
         }
 
         $accountSummary = $this->prophesize(\Google_Service_Analytics_AccountSummary::class);
@@ -433,10 +453,10 @@ class GoogleAnalyticsTest extends TestCase
         return $return;
     }
 
-    private function mockReportResponse(int $rows = 3): GetReportsResponse
+    private function mockReportResponse(): GetReportsResponse
     {
         $response = new GetReportsResponse();
-        $response->setReports([$this->mockReport($rows)]);
+        $response->setReports([$this->mockReport()]);
 
         return $response;
     }
