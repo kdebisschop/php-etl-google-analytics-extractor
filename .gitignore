@@ -7,3 +7,5 @@
 /.php_cs.cache
 /coverage.xml
 /junit.xml
+
+composer.lock

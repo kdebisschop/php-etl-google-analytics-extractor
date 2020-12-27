@@ -75,7 +75,7 @@ class GoogleAnalytics extends Extractor
     private const REPORT_PAGE_SIZE = 1000;
 
     /** @var array */
-    protected $availableOptions = ['startDate', 'endDate', 'views', 'dimensions', 'metrics'];
+    protected $availableOptions = ['startDate', 'endDate', 'views', 'properties', 'dimensions', 'metrics'];
 
     /**
      * The dimension or dimensions used to group analytics data (frequently "ga:date").
@@ -136,6 +136,17 @@ class GoogleAnalytics extends Extractor
      */
     protected array $views = [];
 
+    /**
+     * If specified, properties will limit the specific GA properties to extract.
+     *
+     * ```php
+     * $options = ['properties' => ['All data']];
+     * ```
+     *
+     * @var string[]
+     */
+    protected array $properties = [];
+
     private \Google_Service_Analytics $analyticsService;
 
     /** @var string[] */
@@ -165,7 +176,7 @@ class GoogleAnalytics extends Extractor
      */
     public function __construct(string $config = '')
     {
-        if ('' !== $config && file_exists($config)) {
+        if (file_exists($config)) {
             $client = new \Google_Client();
             $client->setApplicationName('PHP ETL');
             $client->setScopes(['https://www.googleapis.com/auth/analytics.readonly']);
@@ -175,6 +186,7 @@ class GoogleAnalytics extends Extractor
             $this->analyticsService = new \Google_Service_Analytics($client);
             $this->reportingService = new \Google_Service_AnalyticsReporting($client);
         }
+        $this->reportRequest = new \Google_Service_AnalyticsReporting_ReportRequest();
     }
 
     public function options(array $options): Step
@@ -192,7 +204,8 @@ class GoogleAnalytics extends Extractor
     {
         $this->reportRequestSetup($this->dimensions, $this->metrics, $this->startDate, $this->endDate);
 
-        foreach ($this->getProfiles() as $propertyName => $profileSummary) {
+        foreach ($this->getProfiles() as $profile) {
+            [$propertyName, $profileSummary] = $profile;
             $this->delay();
             $summaryName = $profileSummary->getName();
             if (!$this->isWantedView($summaryName)) {
@@ -236,6 +249,16 @@ class GoogleAnalytics extends Extractor
     }
 
     /**
+     * Enables dependency injection for the analytics reporting service.
+     */
+    public function setReportRequest(\Google_Service_AnalyticsReporting_ReportRequest $reportRequest): self
+    {
+        $this->reportRequest = $reportRequest;
+
+        return $this;
+    }
+
+    /**
      * Delay requests to avoid exceeding Google quotas.
      *
      * Quota we are avoiding here is the "Requests per 100 seconds per user" setting in the API console. By default,
@@ -256,7 +279,7 @@ class GoogleAnalytics extends Extractor
             usleep((int) (1000000 * $delay));
         }
 
-        $this->clientReqCount++;
+        ++$this->clientReqCount;
     }
 
     /**
@@ -278,15 +301,14 @@ class GoogleAnalytics extends Extractor
         /** @var \Google_Service_Analytics_ProfileSummary[] $profiles */
         $profiles = [];
         $accountSummaries = $this->analyticsService->management_accountSummaries->listManagementAccountSummaries();
-        /** @var \Google_Service_Analytics_AccountSummary $accountSummary */
         foreach ($accountSummaries->getItems() as $accountSummary) {
-            /** @var \Google_Service_Analytics_WebPropertySummary $propertySummary */
             foreach ($accountSummary->getWebProperties() as $propertySummary) {
                 $propertyName = $propertySummary->getName();
-                if (!$this->isWantedProperty($propertyName)) {
-                    continue;
+                if ($this->isWantedProperty($propertyName)) {
+                    foreach ($propertySummary->getProfiles() as $profile) {
+                        $profiles[] = [$propertyName, $profile];
+                    }
                 }
-                $profiles[$propertyName] = $propertySummary->getProfiles()[0];
             }
         }
 
@@ -298,7 +320,7 @@ class GoogleAnalytics extends Extractor
      */
     private function isWantedProperty(string $name): bool
     {
-        return !isset($this->input) || 0 === count($this->input) || in_array($name, $this->input, true);
+        return 0 === count($this->properties) || in_array($name, $this->properties, true);
     }
 
     /**
@@ -306,7 +328,7 @@ class GoogleAnalytics extends Extractor
      */
     private function isWantedView(string $name): bool
     {
-        return !isset($this->input) || 0 === count($this->views) || in_array($name, $this->views, true);
+        return 0 === count($this->views) || in_array($name, $this->views, true);
     }
 
     /**
@@ -329,10 +351,8 @@ class GoogleAnalytics extends Extractor
      */
     private function reportRequestSetup(array $dimensions, array $metrics, string $start, string $end): void
     {
-        $this->reportRequest = new \Google_Service_AnalyticsReporting_ReportRequest();
         $this->reportRequest->setDateRanges(Request::dateRange($start, $end));
         $this->reportRequest->setDimensions(Request::dimensions($dimensions));
-        $this->reportRequest->setDimensionFilterClauses([]);
         $this->reportRequest->setMetrics(Request::metrics($metrics));
         $this->reportRequest->setPageSize(Request::REPORT_PAGE_SIZE);
         $this->reportRequest->setIncludeEmptyRows(true);
@@ -345,7 +365,6 @@ class GoogleAnalytics extends Extractor
     {
         $header = $report->getColumnHeader();
         $this->dimensionHeaders = $header->getDimensions();
-        /** @var \Google_Service_AnalyticsReporting_MetricHeaderEntry[] $headerEntries */
         $headerEntries = $header->getMetricHeader()->getMetricHeaderEntries();
         $this->metricHeaders = array_map(
             function (\Google_Service_AnalyticsReporting_MetricHeaderEntry $headerEntry) {
@@ -357,6 +376,8 @@ class GoogleAnalytics extends Extractor
 
     /**
      * Validate the options passed in while setting up the ETL step.
+     *
+     * @throws \InvalidArgumentException
      */
     private function validate(): void
     {

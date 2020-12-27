@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+/**
+ * @var iterable<string> $finder
+ */
 $finder = PhpCsFixer\Finder::create()
     ->exclude('vendor')
     ->in(__DIR__);
@@ -10,7 +13,6 @@ $customRules = [
   '@Symfony' => true,
   'array_syntax' => ['syntax' => 'short'],
   'concat_space' => ['spacing' => 'one'],
-  'increment_style' => ['style' => 'post'],
   'declare_strict_types' => true,
   'phpdoc_summary' => false,
 ];
@@ -34,7 +36,8 @@ $psr12Rules = [
 ];
 
 $config = new PhpCsFixer\Config();
-$config->setRules($customRules + $psr12Rules)
+$config->setRiskyAllowed(true)
+    ->setRules($customRules + $psr12Rules)
     ->setFinder($finder);
 
 return $config;
