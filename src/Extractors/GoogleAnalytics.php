@@ -11,8 +11,6 @@ declare(strict_types=1);
 namespace PhpEtl\GoogleAnalytics\Extractors;
 
 use Google\Exception as GoogleException;
-use SebastianBergmann\Timer\Timer;
-use Symfony\Component\Stopwatch\Stopwatch;
 use Wizaplace\Etl\Extractors\Extractor;
 use Wizaplace\Etl\Row;
 use Wizaplace\Etl\Step;
