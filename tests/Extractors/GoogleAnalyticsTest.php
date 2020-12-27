@@ -12,10 +12,36 @@ namespace PhpEtl\GoogleAnalytics\Tests\Extractors;
 
 use Google_Service_AnalyticsReporting_GetReportsResponse as GetReportsResponse;
 use PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics;
+use PhpEtl\GoogleAnalytics\Extractors\Request;
 use PhpEtl\GoogleAnalytics\Tests\TestCase;
+use PHPUnit\Framework\MockObject\Matcher;
+use Prophecy\Argument;
+use Wizaplace\Etl\Extractors\Extractor;
 
 /**
  * Tests GoogleAnalytics.
+ *
+ * @coversDefaultClass \PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics
+ *
+ * @covers ::__construct
+ * @covers ::extract
+ * @covers ::getProfiles
+ * @covers ::getRowData
+ * @covers ::isWantedProperty
+ * @covers ::isWantedView
+ * @covers ::options
+ * @covers ::setAnalyticsSvc
+ * @covers ::setReportRequest
+ * @covers ::setReportingSvc
+ * @covers ::validate
+ * @uses \PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics::delay
+ * @covers ::reportRequest
+ * @covers ::reportRequestSetup
+ * @uses \PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics::setHeaders
+ * @uses \PhpEtl\GoogleAnalytics\Extractors\Request::dateRange
+ * @uses \PhpEtl\GoogleAnalytics\Extractors\Request::dimensions
+ * @uses \PhpEtl\GoogleAnalytics\Extractors\Request::metrics
+ *
  */
 class GoogleAnalyticsTest extends TestCase
 {
@@ -27,7 +53,8 @@ class GoogleAnalyticsTest extends TestCase
     protected array $input = [];
 
     protected array $options = [
-        'startDate' => '2010-11-11',
+        'startDate' => '2020-11-01',
+        'endDate' => '2020-12-31',
         'dimensions' => [self::GA_DATE],
         'metrics' => [
             ['name' => self::GA_PAGE_VIEWS, 'type' => 'INTEGER'],
@@ -42,10 +69,16 @@ class GoogleAnalyticsTest extends TestCase
 
     private string $site = 'www.example.com';
 
+    private GoogleAnalytics $extractor;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->dimensionHeaders = $this->options['dimensions'];
+        $this->extractor = new GoogleAnalytics();
+        $this->extractor->setAnalyticsSvc($this->mockAnalyticsService())
+            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
+        $this->extractor->input($this->input);
     }
 
     /**
@@ -53,22 +86,39 @@ class GoogleAnalyticsTest extends TestCase
      */
     public function defaultOptions(): void
     {
+        $this->extractor->setReportRequest($this->mockReportingRequest());
         $expected = [
             $this->oneRow('2020-11-11', 2, 2.2, 2200),
             $this->oneRow('2020-11-12', 3, 3.3, 3300),
             $this->oneRow('2020-11-13', 5, 5.5, 5500),
         ];
-        $extractor = new GoogleAnalytics();
-        $extractor->input($this->input);
-        $extractor->options($this->options);
-        $extractor->setAnalyticsSvc($this->mockAnalyticsService())
-            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
+        $this->options['properties'] = [$this->site];
+        $this->extractor->options($this->options);
 
         $i = 0;
         /** @var \Wizaplace\Etl\Row $row */
-        foreach ($extractor->extract() as $row) {
+        foreach ($this->extractor->extract() as $row) {
             static::assertEquals($expected[$i++], ($row->toArray()));
         }
+        static::assertEquals(3, $i);
+    }
+
+    /**
+     * @test
+     */
+    public function allViews(): void
+    {
+        $this->extractor->setReportRequest($this->mockReportingRequest());
+        $this->options['properties'] = [$this->site];
+        $this->extractor->options($this->options);
+
+        $i = 0;
+        $iterator = $this->extractor->extract();
+        while ($iterator->valid()) {
+            $iterator->next();
+            ++$i;
+        }
+        static::assertEquals(3, $i);
     }
 
     /**
@@ -76,15 +126,13 @@ class GoogleAnalyticsTest extends TestCase
      */
     public function includeView(): void
     {
-        $extractor = new GoogleAnalytics();
-        $extractor->input($this->input);
+        $this->extractor->setReportRequest($this->mockReportingRequest());
         $this->options['views'] = [$this->profile, 'Some Data'];
-        $extractor->options($this->options);
-        $extractor->setAnalyticsSvc($this->mockAnalyticsService())
-            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
+        $this->options['properties'] = [$this->site];
+        $this->extractor->options($this->options);
 
         $i = 0;
-        $iterator = $extractor->extract();
+        $iterator = $this->extractor->extract();
         while ($iterator->valid()) {
             $iterator->next();
             ++$i;
@@ -97,15 +145,11 @@ class GoogleAnalyticsTest extends TestCase
      */
     public function skipView(): void
     {
-        $extractor = new GoogleAnalytics();
-        $extractor->input($this->input);
         $this->options['views'] = ['Some Data'];
-        $extractor->options($this->options);
-        $extractor->setAnalyticsSvc($this->mockAnalyticsService())
-            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
+        $this->extractor->options($this->options);
 
         $i = 0;
-        $iterator = $extractor->extract();
+        $iterator = $this->extractor->extract();
         while ($iterator->valid()) {
             $iterator->next();
             ++$i;
@@ -116,17 +160,33 @@ class GoogleAnalyticsTest extends TestCase
     /**
      * @test
      */
-    public function includeProperty(): void
+    public function allPropertiesViews(): void
     {
-        $extractor = new GoogleAnalytics();
-        $extractor->input($this->input);
-        $this->options['properties'] = ['www.example.info', $this->site];
-        $extractor->options($this->options);
-        $extractor->setAnalyticsSvc($this->mockAnalyticsService())
-            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
+        $this->extractor->setReportRequest($this->mockReportingRequest());
+        $this->options['properties'] = [$this->site, 'not-a-site.example.com'];
+        $this->options['views'] = [$this->profile];
+        $this->extractor->options($this->options);
 
         $i = 0;
-        $iterator = $extractor->extract();
+        $iterator = $this->extractor->extract();
+        while ($iterator->valid()) {
+            $iterator->next();
+            ++$i;
+        }
+        static::assertEquals(6, $i);
+    }
+
+    /**
+     * @test
+     */
+    public function includeProperty(): void
+    {
+        $this->extractor->setReportRequest($this->mockReportingRequest());
+        $this->options['properties'] = ['www.example.info', $this->site];
+        $this->extractor->options($this->options);
+
+        $i = 0;
+        $iterator = $this->extractor->extract();
         while ($iterator->valid()) {
             $iterator->next();
             ++$i;
@@ -139,15 +199,11 @@ class GoogleAnalyticsTest extends TestCase
      */
     public function skipProperty(): void
     {
-        $extractor = new GoogleAnalytics();
-        $extractor->input($this->input);
         $this->options['properties'] = ['www.example.info', 'www.example.org'];
-        $extractor->options($this->options);
-        $extractor->setAnalyticsSvc($this->mockAnalyticsService())
-            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
+        $this->extractor->options($this->options);
 
         $i = 0;
-        $iterator = $extractor->extract();
+        $iterator = $this->extractor->extract();
         while ($iterator->valid()) {
             $iterator->next();
             ++$i;
@@ -160,10 +216,26 @@ class GoogleAnalyticsTest extends TestCase
      */
     public function noDimension(): void
     {
-        $extractor = new GoogleAnalytics();
         unset($this->options['dimensions']);
         static::expectException(\InvalidArgumentException::class);
-        $extractor->options($this->options);
+        $this->extractor->options($this->options);
+    }
+
+    /**
+     * @test
+     */
+    public function oneDimension(): void
+    {
+        static::assertInstanceOf(Extractor::class, $this->extractor->options($this->options));
+    }
+
+    /**
+     * @test
+     */
+    public function sevenDimensions(): void
+    {
+        $this->options['dimensions'] = range(1, 7);
+        static::assertInstanceOf(Extractor::class, $this->extractor->options($this->options));
     }
 
     /**
@@ -171,10 +243,9 @@ class GoogleAnalyticsTest extends TestCase
      */
     public function tooManyDimensions(): void
     {
-        $extractor = new GoogleAnalytics();
-        $this->options['dimensions'] = ['1', '2', '3', '4', '5', '6', '7', '8'];
+        $this->options['dimensions'] = range(1, 8);
         static::expectException(\InvalidArgumentException::class);
-        $extractor->options($this->options);
+        $this->extractor->options($this->options);
     }
 
     /**
@@ -182,10 +253,27 @@ class GoogleAnalyticsTest extends TestCase
      */
     public function noMetrics(): void
     {
-        $extractor = new GoogleAnalytics();
         unset($this->options['metrics']);
         static::expectException(\InvalidArgumentException::class);
-        $extractor->options($this->options);
+        $this->extractor->options($this->options);
+    }
+
+    /**
+     * @test
+     */
+    public function oneMetric(): void
+    {
+        $this->options['metrics'] = [self::GA_AVG_PAGE_LOAD_TIME];
+        static::assertInstanceOf(Extractor::class, $this->extractor->options($this->options));
+    }
+
+    /**
+     * @test
+     */
+    public function tenMetrics(): void
+    {
+        $this->options['metrics'] = range(1, 10);
+        static::assertInstanceOf(Extractor::class, $this->extractor->options($this->options));
     }
 
     /**
@@ -193,10 +281,9 @@ class GoogleAnalyticsTest extends TestCase
      */
     public function tooManyMetrics(): void
     {
-        $extractor = new GoogleAnalytics();
         $this->options['metrics'] = range(1, 11);
         static::expectException(\InvalidArgumentException::class);
-        $extractor->options($this->options);
+        $this->extractor->options($this->options);
     }
 
     /**
@@ -204,10 +291,9 @@ class GoogleAnalyticsTest extends TestCase
      */
     public function noStartDate(): void
     {
-        $extractor = new GoogleAnalytics();
         unset($this->options['startDate']);
         static::expectException(\InvalidArgumentException::class);
-        $extractor->options($this->options);
+        $this->extractor->options($this->options);
     }
 
     private function oneRow(string $date, int $pages, float $time, int $duration): array
@@ -267,12 +353,20 @@ class GoogleAnalyticsTest extends TestCase
         $profile->getId()->willReturn('12345');
         $profile->getName()->willReturn($this->profile);
 
+        $secondProfile = $this->prophesize(\Google_Service_Analytics_ProfileSummary::class);
+        $secondProfile->getId()->willReturn('123456');
+        $secondProfile->getName()->willReturn('No Data');
+
         $propertySummary = $this->prophesize(\Google_Service_Analytics_WebPropertySummary::class);
         $propertySummary->getName()->willReturn($this->site);
         $propertySummary->getProfiles()->willReturn([$profile->reveal()]);
 
+        $secondProperty = $this->prophesize(\Google_Service_Analytics_WebPropertySummary::class);
+        $secondProperty->getName()->willReturn('not-a-site.example.com');
+        $secondProperty->getProfiles()->willReturn([$secondProfile->reveal(), $profile->reveal()]);
+
         $accountSummary = $this->prophesize(\Google_Service_Analytics_AccountSummary::class);
-        $accountSummary->getWebProperties()->willReturn([$propertySummary->reveal()]);
+        $accountSummary->getWebProperties()->willReturn([$propertySummary->reveal(), $secondProperty->reveal()]);
 
         $accountSummaries = $this->prophesize(\Google_Service_Analytics_AccountSummaries::class);
         $accountSummaries->getItems()->willReturn([$accountSummary->reveal()]);
@@ -305,5 +399,17 @@ class GoogleAnalyticsTest extends TestCase
         $reportingService->reports = $mock;
 
         return $reportingService;
+    }
+
+    private function mockReportingRequest(): \Google_Service_AnalyticsReporting_ReportRequest
+    {
+        $mock = $this->prophesize(\Google_Service_AnalyticsReporting_ReportRequest::class);
+        $mock->setPageSize(1000)->shouldBeCalled();
+        $mock->setDateRanges(Request::dateRange('2020-11-01', '2020-12-31'))->shouldBeCalled();
+        $mock->setDimensions(Request::dimensions(['ga:date']))->shouldBeCalled();
+        $mock->setMetrics(Request::metrics($this->options['metrics']))->shouldBeCalled();
+        $mock->setIncludeEmptyRows(true)->shouldBeCalled();
+        $mock->setViewId(Argument::any())->shouldBeCalled();
+        return $mock->reveal();
     }
 }

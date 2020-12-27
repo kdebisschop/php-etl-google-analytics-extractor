@@ -176,7 +176,7 @@ class GoogleAnalytics extends Extractor
      */
     public function __construct(string $config = '')
     {
-        if ('' !== $config && file_exists($config)) {
+        if (file_exists($config)) {
             $client = new \Google_Client();
             $client->setApplicationName('PHP ETL');
             $client->setScopes(['https://www.googleapis.com/auth/analytics.readonly']);
@@ -186,6 +186,7 @@ class GoogleAnalytics extends Extractor
             $this->analyticsService = new \Google_Service_Analytics($client);
             $this->reportingService = new \Google_Service_AnalyticsReporting($client);
         }
+        $this->reportRequest = new \Google_Service_AnalyticsReporting_ReportRequest();
     }
 
     public function options(array $options): Step
@@ -203,7 +204,8 @@ class GoogleAnalytics extends Extractor
     {
         $this->reportRequestSetup($this->dimensions, $this->metrics, $this->startDate, $this->endDate);
 
-        foreach ($this->getProfiles() as $propertyName => $profileSummary) {
+        foreach ($this->getProfiles() as $profile) {
+            [$propertyName, $profileSummary] = $profile;
             $this->delay();
             $summaryName = $profileSummary->getName();
             if (!$this->isWantedView($summaryName)) {
@@ -242,6 +244,16 @@ class GoogleAnalytics extends Extractor
     public function setReportingSvc(\Google_Service_AnalyticsReporting $reportingService): self
     {
         $this->reportingService = $reportingService;
+
+        return $this;
+    }
+
+    /**
+     * Enables dependency injection for the analytics reporting service.
+     */
+    public function setReportRequest(\Google_Service_AnalyticsReporting_ReportRequest $reportRequest): self
+    {
+        $this->reportRequest = $reportRequest;
 
         return $this;
     }
@@ -293,7 +305,9 @@ class GoogleAnalytics extends Extractor
             foreach ($accountSummary->getWebProperties() as $propertySummary) {
                 $propertyName = $propertySummary->getName();
                 if ($this->isWantedProperty($propertyName)) {
-                    $profiles[$propertyName] = $propertySummary->getProfiles()[0];
+                    foreach ($propertySummary->getProfiles() as $profile) {
+                        $profiles[] = [$propertyName, $profile];
+                    }
                 }
             }
         }
@@ -306,7 +320,7 @@ class GoogleAnalytics extends Extractor
      */
     private function isWantedProperty(string $name): bool
     {
-        return !isset($this->properties) || 0 === count($this->properties) || in_array($name, $this->properties, true);
+        return 0 === count($this->properties) || in_array($name, $this->properties, true);
     }
 
     /**
@@ -314,7 +328,7 @@ class GoogleAnalytics extends Extractor
      */
     private function isWantedView(string $name): bool
     {
-        return !isset($this->views) || 0 === count($this->views) || in_array($name, $this->views, true);
+        return 0 === count($this->views) || in_array($name, $this->views, true);
     }
 
     /**
@@ -337,10 +351,8 @@ class GoogleAnalytics extends Extractor
      */
     private function reportRequestSetup(array $dimensions, array $metrics, string $start, string $end): void
     {
-        $this->reportRequest = new \Google_Service_AnalyticsReporting_ReportRequest();
         $this->reportRequest->setDateRanges(Request::dateRange($start, $end));
         $this->reportRequest->setDimensions(Request::dimensions($dimensions));
-        $this->reportRequest->setDimensionFilterClauses([]);
         $this->reportRequest->setMetrics(Request::metrics($metrics));
         $this->reportRequest->setPageSize(Request::REPORT_PAGE_SIZE);
         $this->reportRequest->setIncludeEmptyRows(true);
@@ -364,6 +376,8 @@ class GoogleAnalytics extends Extractor
 
     /**
      * Validate the options passed in while setting up the ETL step.
+     *
+     * @throws \InvalidArgumentException
      */
     private function validate(): void
     {
