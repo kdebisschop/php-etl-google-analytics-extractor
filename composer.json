@@ -39,6 +39,7 @@
         }
     },
     "scripts": {
+        "fix": "php-cs-fixer fix -v",
         "fixer": "php-cs-fixer fix --dry-run -v",
         "cs": "phpcs -p -s",
         "analyze": "phpstan --memory-limit=256M analyze",

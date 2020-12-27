@@ -77,6 +77,7 @@ class RequestTest extends TestCase
         $metric->setExpression($name);
         $metric->setAlias(str_replace('ga:', '', $name));
         $metric->setFormattingType($type);
+
         return $metric;
     }
 
@@ -85,6 +86,7 @@ class RequestTest extends TestCase
         $dateRange = new \Google_Service_AnalyticsReporting_DateRange();
         $dateRange->setStartDate($start);
         $dateRange->setEndDate($end);
+
         return $dateRange;
     }
 
@@ -92,6 +94,7 @@ class RequestTest extends TestCase
     {
         $dimension = new \Google_Service_AnalyticsReporting_Dimension();
         $dimension->setName($name);
+
         return $dimension;
     }
 }

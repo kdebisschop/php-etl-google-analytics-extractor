@@ -14,7 +14,6 @@ use Google_Service_AnalyticsReporting_GetReportsResponse as GetReportsResponse;
 use PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics;
 use PhpEtl\GoogleAnalytics\Extractors\Request;
 use PhpEtl\GoogleAnalytics\Tests\TestCase;
-use PHPUnit\Framework\MockObject\Matcher;
 use Prophecy\Argument;
 use Wizaplace\Etl\Extractors\Extractor;
 
@@ -34,14 +33,15 @@ use Wizaplace\Etl\Extractors\Extractor;
  * @covers ::setReportRequest
  * @covers ::setReportingSvc
  * @covers ::validate
+ *
  * @uses \PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics::delay
  * @covers ::reportRequest
  * @covers ::reportRequestSetup
+ *
  * @uses \PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics::setHeaders
  * @uses \PhpEtl\GoogleAnalytics\Extractors\Request::dateRange
  * @uses \PhpEtl\GoogleAnalytics\Extractors\Request::dimensions
  * @uses \PhpEtl\GoogleAnalytics\Extractors\Request::metrics
- *
  */
 class GoogleAnalyticsTest extends TestCase
 {
@@ -410,6 +410,7 @@ class GoogleAnalyticsTest extends TestCase
         $mock->setMetrics(Request::metrics($this->options['metrics']))->shouldBeCalled();
         $mock->setIncludeEmptyRows(true)->shouldBeCalled();
         $mock->setViewId(Argument::any())->shouldBeCalled();
+
         return $mock->reveal();
     }
 }
