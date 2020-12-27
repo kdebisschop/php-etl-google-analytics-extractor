@@ -74,7 +74,9 @@ class GoogleAnalytics extends Extractor
 {
     private const REPORT_PAGE_SIZE = 1000;
 
-    /** @var array */
+    /**
+     * @var array
+     */
     protected $availableOptions = ['startDate', 'endDate', 'views', 'properties', 'dimensions', 'metrics'];
 
     /**
@@ -140,26 +142,34 @@ class GoogleAnalytics extends Extractor
      * If specified, properties will limit the specific GA properties to extract.
      *
      * ```php
-     * $options = ['properties' => ['All data']];
+     * $options = ['properties' => ['www.example.com']];
      * ```
      *
      * @var string[]
      */
     protected array $properties = [];
 
-    private \Google_Service_Analytics $analyticsService;
+    protected \Closure $delayFunction;
 
-    /** @var string[] */
+    /**
+     * @var string[]
+     */
     private array $dimensionHeaders;
 
-    /** @var string[] */
+    /**
+     * @var string[]
+     */
     private array $metricHeaders;
 
-    private \Google_Service_AnalyticsReporting $reportingService;
-
-    private \Google_Service_AnalyticsReporting_ReportRequest $reportRequest;
-
     private int $clientReqCount = 0;
+
+    protected int $oneSecond = 1000000;
+
+    protected \Google_Service_Analytics $analyticsService;
+
+    protected \Google_Service_AnalyticsReporting $reportingService;
+
+    protected \Google_Service_AnalyticsReporting_ReportRequest $reportRequest;
 
     /**
      * Creates a new Google Analytics Extractor instance.
@@ -194,6 +204,13 @@ class GoogleAnalytics extends Extractor
         parent::options($options);
         $this->validate();
 
+        if (!isset($this->delayFunction)) {
+            // Delay 1 second to avoid 100 requests per 100 seconds quota exceeded.
+            $this->delayFunction = function (): void {
+                usleep($this->oneSecond);
+            };
+        }
+
         return $this;
     }
 
@@ -214,7 +231,10 @@ class GoogleAnalytics extends Extractor
 
             $request = $this->reportRequest($profileSummary->getId());
             $response = $this->reportingService->reports->batchGet($request);
-            /** @var \Google_Service_AnalyticsReporting_Report $report */
+
+            /**
+             * @var \Google_Service_AnalyticsReporting_Report $report
+             */
             foreach ($response as $report) {
                 $this->setHeaders($report);
                 $rows = $report->getData()->getRows();
@@ -226,36 +246,6 @@ class GoogleAnalytics extends Extractor
                 }
             }
         }
-    }
-
-    /**
-     * Enables dependency injection for the analytics service.
-     */
-    public function setAnalyticsSvc(\Google_Service_Analytics $analyticsService): self
-    {
-        $this->analyticsService = $analyticsService;
-
-        return $this;
-    }
-
-    /**
-     * Enables dependency injection for the analytics reporting service.
-     */
-    public function setReportingSvc(\Google_Service_AnalyticsReporting $reportingService): self
-    {
-        $this->reportingService = $reportingService;
-
-        return $this;
-    }
-
-    /**
-     * Enables dependency injection for the analytics reporting service.
-     */
-    public function setReportRequest(\Google_Service_AnalyticsReporting_ReportRequest $reportRequest): self
-    {
-        $this->reportRequest = $reportRequest;
-
-        return $this;
     }
 
     /**
@@ -274,11 +264,8 @@ class GoogleAnalytics extends Extractor
     private function delay(): void
     {
         if ($this->clientReqCount >= 100) {
-            // Delay 1 second plus or minus a random jitter to avoid 100 requests per 100 seconds quota exceeded.
-            $delay = 1 + (mt_rand() / mt_getrandmax() - 0.5);
-            usleep((int) (1000000 * $delay));
+            call_user_func($this->delayFunction);
         }
-
         ++$this->clientReqCount;
     }
 
