@@ -11,6 +11,7 @@ declare(strict_types=1);
 namespace PhpEtl\GoogleAnalytics\Tests\Extractors;
 
 use Google_Service_AnalyticsReporting_GetReportsResponse as GetReportsResponse;
+use Google_Service_AnalyticsReporting_ReportRequest as ReportRequest;
 use PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics;
 use PhpEtl\GoogleAnalytics\Extractors\Request;
 use PhpEtl\GoogleAnalytics\Tests\TestCase;
@@ -23,22 +24,18 @@ use Wizaplace\Etl\Extractors\Extractor;
  * @coversDefaultClass \PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics
  *
  * @covers ::__construct
+ * @covers ::delay
  * @covers ::extract
  * @covers ::getProfiles
  * @covers ::getRowData
  * @covers ::isWantedProperty
  * @covers ::isWantedView
  * @covers ::options
- * @covers ::setAnalyticsSvc
- * @covers ::setReportRequest
- * @covers ::setReportingSvc
- * @covers ::validate
- *
- * @uses \PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics::delay
  * @covers ::reportRequest
  * @covers ::reportRequestSetup
+ * @covers ::setHeaders
+ * @covers ::validate
  *
- * @uses \PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics::setHeaders
  * @uses \PhpEtl\GoogleAnalytics\Extractors\Request::dateRange
  * @uses \PhpEtl\GoogleAnalytics\Extractors\Request::dimensions
  * @uses \PhpEtl\GoogleAnalytics\Extractors\Request::metrics
@@ -50,11 +47,9 @@ class GoogleAnalyticsTest extends TestCase
     private const GA_AVG_PAGE_LOAD_TIME = 'ga:avgPageLoadTime';
     private const GA_AVG_SESSION_DURATION = 'ga:avgSessionDuration';
 
-    protected array $input = [];
-
     protected array $options = [
         'startDate' => '2020-11-01',
-        'endDate' => '2020-12-31',
+        'endDate' => '2020-12-15',
         'dimensions' => [self::GA_DATE],
         'metrics' => [
             ['name' => self::GA_PAGE_VIEWS, 'type' => 'INTEGER'],
@@ -69,16 +64,35 @@ class GoogleAnalyticsTest extends TestCase
 
     private string $site = 'www.example.com';
 
-    private GoogleAnalytics $extractor;
+    private object $extractor;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->dimensionHeaders = $this->options['dimensions'];
-        $this->extractor = new GoogleAnalytics();
-        $this->extractor->setAnalyticsSvc($this->mockAnalyticsService())
-            ->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
-        $this->extractor->input($this->input);
+        $this->extractor = new class extends GoogleAnalytics {
+            public function setAnalyticsSvc(\Google_Service_Analytics $analyticsService): void
+            {
+                $this->analyticsService = $analyticsService;
+            }
+
+            public function setDelayFunction(\Closure $function): void
+            {
+                $this->delayFunction = $function;
+            }
+
+            public function setReportingSvc(\Google_Service_AnalyticsReporting $reportingService): void
+            {
+                $this->reportingService = $reportingService;
+            }
+
+            public function setReportRequest(ReportRequest $reportRequest): void
+            {
+                $this->reportRequest = $reportRequest;
+            }
+        };
+        $this->extractor->setAnalyticsSvc($this->mockAnalyticsService());
+        $this->extractor->setReportingSvc($this->mockReportingService($this->mockReportResponse()));
     }
 
     /**
@@ -101,6 +115,26 @@ class GoogleAnalyticsTest extends TestCase
             static::assertEquals($expected[$i++], ($row->toArray()));
         }
         static::assertEquals(3, $i);
+    }
+
+    /**
+     * @test
+     */
+    public function delay(): void
+    {
+        $function = function (): int {
+            static $i = 0;
+
+            return ++$i;
+        };
+        $this->extractor->options($this->options);
+        $this->extractor->setAnalyticsSvc($this->mockAnalyticsService(50));
+        $this->extractor->setDelayFunction($function);
+        $iterator = $this->extractor->extract();
+        while ($iterator->valid()) {
+            $iterator->next();
+        }
+        static::assertEquals(4, call_user_func($function));
     }
 
     /**
@@ -296,6 +330,17 @@ class GoogleAnalyticsTest extends TestCase
         $this->extractor->options($this->options);
     }
 
+    /**
+     * @test
+     */
+    public function noEndDate(): void
+    {
+        $this->extractor->setReportRequest($this->mockReportingRequest(date('Y-m-d', strtotime('-1 day'))));
+        unset($this->options['endDate']);
+        $this->extractor->options($this->options);
+        $this->extractor->extract()->current();
+    }
+
     private function oneRow(string $date, int $pages, float $time, int $duration): array
     {
         return [
@@ -319,7 +364,7 @@ class GoogleAnalyticsTest extends TestCase
         return $row;
     }
 
-    private function mockReport(): \Google_Service_AnalyticsReporting_Report
+    private function mockReport(int $rowCount): \Google_Service_AnalyticsReporting_Report
     {
         $report = new \Google_Service_AnalyticsReporting_Report();
         $reportData = new \Google_Service_AnalyticsReporting_ReportData();
@@ -328,6 +373,9 @@ class GoogleAnalyticsTest extends TestCase
             $this->mockReportRow(['2020-11-12'], [3, 3.3, 3300]),
             $this->mockReportRow(['2020-11-13'], [5, 5.5, 5500]),
         ];
+        for ($i = 3; $i < $rowCount; ++$i) {
+            $rows[] = $this->mockReportRow(["2020-11-$i"], [$i, $i, $i]);
+        }
         $reportData->setRows($rows);
         $report->setData($reportData);
         $columnHeader = new \Google_Service_AnalyticsReporting_ColumnHeader();
@@ -347,7 +395,7 @@ class GoogleAnalyticsTest extends TestCase
         return $report;
     }
 
-    private function mockAnalyticsService(): \Google_Service_Analytics
+    private function mockAnalyticsService(int $sites = 0): \Google_Service_Analytics
     {
         $profile = $this->prophesize(\Google_Service_Analytics_ProfileSummary::class);
         $profile->getId()->willReturn('12345');
@@ -364,9 +412,13 @@ class GoogleAnalyticsTest extends TestCase
         $secondProperty = $this->prophesize(\Google_Service_Analytics_WebPropertySummary::class);
         $secondProperty->getName()->willReturn('not-a-site.example.com');
         $secondProperty->getProfiles()->willReturn([$secondProfile->reveal(), $profile->reveal()]);
+        $properties = [$propertySummary->reveal(), $secondProperty->reveal()];
+        for ($i = 0; $i < $sites; ++$i) {
+            $properties[] = $secondProperty->reveal();
+        }
 
         $accountSummary = $this->prophesize(\Google_Service_Analytics_AccountSummary::class);
-        $accountSummary->getWebProperties()->willReturn([$propertySummary->reveal(), $secondProperty->reveal()]);
+        $accountSummary->getWebProperties()->willReturn($properties);
 
         $accountSummaries = $this->prophesize(\Google_Service_Analytics_AccountSummaries::class);
         $accountSummaries->getItems()->willReturn([$accountSummary->reveal()]);
@@ -381,10 +433,10 @@ class GoogleAnalyticsTest extends TestCase
         return $return;
     }
 
-    private function mockReportResponse(): GetReportsResponse
+    private function mockReportResponse(int $rows = 3): GetReportsResponse
     {
         $response = new GetReportsResponse();
-        $response->setReports([$this->mockReport()]);
+        $response->setReports([$this->mockReport($rows)]);
 
         return $response;
     }
@@ -401,11 +453,11 @@ class GoogleAnalyticsTest extends TestCase
         return $reportingService;
     }
 
-    private function mockReportingRequest(): \Google_Service_AnalyticsReporting_ReportRequest
+    private function mockReportingRequest(string $endDate = '2020-12-15'): ReportRequest
     {
-        $mock = $this->prophesize(\Google_Service_AnalyticsReporting_ReportRequest::class);
+        $mock = $this->prophesize(ReportRequest::class);
         $mock->setPageSize(1000)->shouldBeCalled();
-        $mock->setDateRanges(Request::dateRange('2020-11-01', '2020-12-31'))->shouldBeCalled();
+        $mock->setDateRanges(Request::dateRange($this->options['startDate'], $endDate))->shouldBeCalled();
         $mock->setDimensions(Request::dimensions(['ga:date']))->shouldBeCalled();
         $mock->setMetrics(Request::metrics($this->options['metrics']))->shouldBeCalled();
         $mock->setIncludeEmptyRows(true)->shouldBeCalled();
