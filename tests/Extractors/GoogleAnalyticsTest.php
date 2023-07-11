@@ -15,6 +15,7 @@ use Google_Service_AnalyticsReporting_ReportRequest as ReportRequest;
 use PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics;
 use PhpEtl\GoogleAnalytics\Extractors\Request;
 use PhpEtl\GoogleAnalytics\Tests\TestCase;
+use Prophecy\PhpUnit\ProphecyTrait;
 use Prophecy\Argument;
 use Wizaplace\Etl\Extractors\Extractor;
 
@@ -42,6 +43,10 @@ use Wizaplace\Etl\Extractors\Extractor;
  */
 class GoogleAnalyticsTest extends TestCase
 {
+    use ProphecyTrait {
+        ProphecyTrait::prophesize as phpspecProphesize;
+    }
+
     private const GA_DATE = 'ga:date';
     private const GA_PAGE_VIEWS = 'ga:pageviews';
     private const GA_AVG_PAGE_LOAD_TIME = 'ga:avgPageLoadTime';
@@ -416,19 +421,19 @@ class GoogleAnalyticsTest extends TestCase
 
     private function mockAnalyticsService(int $sites = 0): \Google_Service_Analytics
     {
-        $profile = $this->prophesize(\Google_Service_Analytics_ProfileSummary::class);
+        $profile = $this->phpspecProphesize(\Google_Service_Analytics_ProfileSummary::class);
         $profile->getId()->willReturn('12345');
         $profile->getName()->willReturn($this->profile);
 
-        $secondProfile = $this->prophesize(\Google_Service_Analytics_ProfileSummary::class);
+        $secondProfile = $this->phpspecProphesize(\Google_Service_Analytics_ProfileSummary::class);
         $secondProfile->getId()->willReturn('123456');
         $secondProfile->getName()->willReturn('No Data');
 
-        $propertySummary = $this->prophesize(\Google_Service_Analytics_WebPropertySummary::class);
+        $propertySummary = $this->phpspecProphesize(\Google_Service_Analytics_WebPropertySummary::class);
         $propertySummary->getName()->willReturn($this->site);
         $propertySummary->getProfiles()->willReturn([$profile->reveal()]);
 
-        $secondProperty = $this->prophesize(\Google_Service_Analytics_WebPropertySummary::class);
+        $secondProperty = $this->phpspecProphesize(\Google_Service_Analytics_WebPropertySummary::class);
         $secondProperty->getName()->willReturn('not-a-site.example.com');
         $secondProperty->getProfiles()->willReturn([$secondProfile->reveal(), $profile->reveal()]);
 
@@ -437,16 +442,16 @@ class GoogleAnalyticsTest extends TestCase
             $properties[] = $propertySummary->reveal();
         }
 
-        $accountSummary = $this->prophesize(\Google_Service_Analytics_AccountSummary::class);
+        $accountSummary = $this->phpspecProphesize(\Google_Service_Analytics_AccountSummary::class);
         $accountSummary->getWebProperties()->willReturn($properties);
 
-        $accountSummaries = $this->prophesize(\Google_Service_Analytics_AccountSummaries::class);
+        $accountSummaries = $this->phpspecProphesize(\Google_Service_Analytics_AccountSummaries::class);
         $accountSummaries->getItems()->willReturn([$accountSummary->reveal()]);
 
-        $mgmtAcctSummary = $this->prophesize(\Google_Service_Analytics_Resource_ManagementAccountSummaries::class);
+        $mgmtAcctSummary = $this->phpspecProphesize(\Google_Service_Analytics_Resource_ManagementAccountSummaries::class);
         $mgmtAcctSummary->listManagementAccountSummaries()->willReturn($accountSummaries->reveal());
 
-        $analyticsService = $this->prophesize(\Google_Service_Analytics::class);
+        $analyticsService = $this->phpspecProphesize(\Google_Service_Analytics::class);
         $return = $analyticsService->reveal();
         $return->management_accountSummaries = $mgmtAcctSummary->reveal();
 
@@ -466,7 +471,7 @@ class GoogleAnalyticsTest extends TestCase
         $mock = $this->createMock(\Google_Service_AnalyticsReporting_Resource_Reports::class);
         $mock->method('batchGet')->willReturn($response);
 
-        $client = $this->prophesize(\Google_Client::class);
+        $client = $this->phpspecProphesize(\Google_Client::class);
         $reportingService = new \Google_Service_AnalyticsReporting($client->reveal());
         $reportingService->reports = $mock;
 
@@ -475,7 +480,8 @@ class GoogleAnalyticsTest extends TestCase
 
     private function mockReportingRequest(string $endDate = '2020-12-15'): ReportRequest
     {
-        $mock = $this->prophesize(ReportRequest::class);
+        /** @var \Prophecy\Prophecy\ObjectProphecy|ReportRequest $mock */
+        $mock = $this->phpspecProphesize(ReportRequest::class);
         $mock->setPageSize(1000)->shouldBeCalled();
         $mock->setDateRanges(Request::dateRange($this->options['startDate'], $endDate))->shouldBeCalled();
         $mock->setDimensions(Request::dimensions(['ga:date']))->shouldBeCalled();

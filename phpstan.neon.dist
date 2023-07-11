@@ -1,8 +1,11 @@
 # WARNING: DO NOT ADD ANY EXCLUSION. THE ONES ALREADY HERE ARE FOR THE LEGACY CODE.
 parameters:
-    level: 6
-    paths:
-        - src
-        - tests
-    checkMissingIterableValueType: false
-    checkGenericClassInNonGenericObjectType: false
+  level: 6
+  paths:
+    - src
+    - tests
+  checkMissingIterableValueType: false
+  checkGenericClassInNonGenericObjectType: false
+  ignoreErrors:
+    - message: '/Call to an undefined method Prophecy\\Prophecy\\ObjectProphecy::.*/'
+      path: tests/Extractors/GoogleAnalyticsTest.php
