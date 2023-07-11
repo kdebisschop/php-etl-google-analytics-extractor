@@ -448,12 +448,12 @@ class GoogleAnalyticsTest extends TestCase
         $accountSummaries = $this->phpspecProphesize(\Google_Service_Analytics_AccountSummaries::class);
         $accountSummaries->getItems()->willReturn([$accountSummary->reveal()]);
 
-        $mgmtAcctSummary = $this->phpspecProphesize(\Google_Service_Analytics_Resource_ManagementAccountSummaries::class);
-        $mgmtAcctSummary->listManagementAccountSummaries()->willReturn($accountSummaries->reveal());
+        $mgmtSummary = $this->phpspecProphesize(\Google_Service_Analytics_Resource_ManagementAccountSummaries::class);
+        $mgmtSummary->listManagementAccountSummaries()->willReturn($accountSummaries->reveal());
 
         $analyticsService = $this->phpspecProphesize(\Google_Service_Analytics::class);
         $return = $analyticsService->reveal();
-        $return->management_accountSummaries = $mgmtAcctSummary->reveal();
+        $return->management_accountSummaries = $mgmtSummary->reveal();
 
         return $return;
     }
