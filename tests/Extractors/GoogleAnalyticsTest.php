@@ -122,7 +122,7 @@ class GoogleAnalyticsTest extends TestCase
         $i = 0;
         /** @var \Wizaplace\Etl\Row $row */
         foreach ($this->extractor->extract() as $row) {
-            static::assertEquals($expected[$i++], ($row->toArray()));
+            static::assertEquals($expected[$i++], $row->toArray());
         }
         static::assertEquals(3, $i);
     }

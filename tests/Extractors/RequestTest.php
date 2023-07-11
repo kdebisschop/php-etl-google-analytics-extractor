@@ -22,6 +22,7 @@ class RequestTest extends TestCase
 {
     /**
      * @test
+     *
      * @covers ::metrics
      */
     public function testMetrics(): void
@@ -42,6 +43,7 @@ class RequestTest extends TestCase
 
     /**
      * @test
+     *
      * @covers ::dateRange()
      */
     public function testDateRange(): void
@@ -53,6 +55,7 @@ class RequestTest extends TestCase
 
     /**
      * @test
+     *
      * @covers ::dimensions
      */
     public function testDimensions(): void
