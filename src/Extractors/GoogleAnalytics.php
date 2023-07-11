@@ -72,10 +72,8 @@ use Wizaplace\Etl\Step;
  */
 class GoogleAnalytics extends Extractor
 {
-    private const REPORT_PAGE_SIZE = 1000;
-
     /**
-     * @var array
+     * @var array<string>
      */
     protected $availableOptions = ['startDate', 'endDate', 'views', 'properties', 'dimensions', 'metrics'];
 
@@ -354,7 +352,7 @@ class GoogleAnalytics extends Extractor
         $this->dimensionHeaders = $header->getDimensions();
         $headerEntries = $header->getMetricHeader()->getMetricHeaderEntries();
         $this->metricHeaders = array_map(
-            function (\Google_Service_AnalyticsReporting_MetricHeaderEntry $headerEntry) {
+            function (\Google_Service_AnalyticsReporting_MetricHeaderEntry $headerEntry): string {
                 return $headerEntry->getName();
             },
             $headerEntries
