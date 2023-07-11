@@ -15,8 +15,8 @@ use Google_Service_AnalyticsReporting_ReportRequest as ReportRequest;
 use PhpEtl\GoogleAnalytics\Extractors\GoogleAnalytics;
 use PhpEtl\GoogleAnalytics\Extractors\Request;
 use PhpEtl\GoogleAnalytics\Tests\TestCase;
-use Prophecy\PhpUnit\ProphecyTrait;
 use Prophecy\Argument;
+use Prophecy\PhpUnit\ProphecyTrait;
 use Wizaplace\Etl\Extractors\Extractor;
 
 /**

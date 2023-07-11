@@ -352,7 +352,7 @@ class GoogleAnalytics extends Extractor
         $this->dimensionHeaders = $header->getDimensions();
         $headerEntries = $header->getMetricHeader()->getMetricHeaderEntries();
         $this->metricHeaders = array_map(
-            function (\Google_Service_AnalyticsReporting_MetricHeaderEntry $headerEntry):string {
+            function (\Google_Service_AnalyticsReporting_MetricHeaderEntry $headerEntry): string {
                 return $headerEntry->getName();
             },
             $headerEntries
